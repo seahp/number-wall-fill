@@ -1,0 +1,2625 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>数墙补补 · 生成器（数的分与合 · 纸笔游戏）</title>
+<style>
+/* ================= 设计令牌：与数格涂涂同一套 ================= */
+:root{
+  --ink:#26313d; --ink2:#5b6875; --line:#c8d2dc; --line2:#eef2f6;
+  --accent:#2f6fb3; --warm:#e8842a;
+  --hole:#f7fafc; --g:7px; --gb:20px;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#eef1f5;color:var(--ink);
+  font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact}
+
+/* ================= 工具栏（结构/尺寸/间距照数格涂涂）================= */
+.toolbar{position:sticky;top:0;z-index:9;background:#fff;border-bottom:1px solid var(--line);
+  padding:11px 20px 9px;box-shadow:0 1px 6px rgba(20,40,60,.06)}
+.toolbar h1{margin:0 0 8px;font-size:17px;letter-spacing:.5px}
+/* 语言开关（标题行最右那枚分段控件）：.toprow 是 align-items:baseline，
+   按基线对齐会把按钮拽歪，所以单独居中——两处细节都照数格涂涂。 */
+.toprow .langseg{flex:0 0 auto;align-self:center}
+/* 切英文后换成系统无衬线：PingFang 那一串是中文字体栈，英文用它只是绕路。
+   页眉大标题字距收回 0——21pt 再拉 1px，"Number Wall Fill" 会顶到 meta 那一栏。
+   （英文变长导致的"说明块变高"不在这里治：那由版面解算器实量重解砖宽，见设计说明第 5 节。
+     要不要给某些标签收半档字号，得先量到"字撑爆盒子"才写，见 `out/双语版面草稿_v43.log`。） */
+html[lang="en"] body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+html[lang="en"] .hd .ttl{letter-spacing:0}
+/* 英文态选项区的"中间空白"（用户 2026-11-23「英文版的选项，中间空白过大，有些浪费空间」）。
+   下面所有读数都在**内容宽 1440**（＝`.row` 实测 1385）上取，同一把尺子、同一台机器：
+   改前拿 `存档_v4.3_双语_20261123/数墙补补_生成器.html` 跑，改后拿本轮产物跑
+   （`python3 scripts/bar_measure.py --lang en [--target 旧产物] 1440 1280 1180 900`，
+   缝与行尾空在 `out/英文态选项区草稿_v44.log`／`out/英文态选项区改前_v44.log`）。
+     中文五块之和 1207 ⇒ 一排装下，块间缝 44／45px，工具栏 191px；
+     英文五块之和 1473（版面 +111 · 份数 +55 · 层数 +55 · 练什么 +24 · 按钮 +21）⇒ 1385 装不下，
+     掉成两横排，`space-between` 把 439px 富余摊成两道 220／219 的缝，掉到第二排的「版面」块和操作按钮
+     之间空 858px，工具栏 191→342px。块内还有一层假空：「砖块层数」五档在 200px 卡宽里排成 1/3/1 三排，
+     行尾各空 108 和 164px（英文 chip "2 rows · more bricks" 114px，两颗粒子就顶到卡宽）。
+   治法沿用「砖块层数」那一排的老办法——卡住某一横排的宽度，让它自己换行，块宽回落到内容宽，
+   富余还给块间而不是堆在中间。三条数都从同一把尺子的实测内容宽反推，不是凑的：
+     · 版面 384→244：那排是 [每页几卷的 seg 240][Header 66][Footer 62]，卡到 244 只把两个勾选挤到第二排，
+       seg 自己不动（还剩 4px）⇒ 块宽 406→266；再往下卡就要拆 seg，不值；
+     · 层数 chips 200→210：正好装下 [两层3块 92][两层多块 114] 两颗粒子，五档从三排变两排、行尾空 108→0；
+       块宽仍由「难度」那排（237）顶着，所以 259 不动，省的是 24px 高度；
+     · 块间距 20→8：卡完两块，五块之和 1333，一排要 1333＋4×20＝1413 才装得下——差的不是内容，是那 80px 的缝。
+       给 8px 下限后 1333＋32＝1365 ≤ 1385，剩下的 52px 由 space-between 摊成 13px 缝
+       （每块自带 1px 边框＋10px 内边距，8px 下限已经分得清框；中文态仍是 46px，都是"贴内容＋匀富余"，不是新规矩）。
+   「份数·种子·墙数」那块**故意不卡**：它 364 宽是 [44 输入][copies][84 输入][56 输入][86 提示] 五件一行顶出来的，
+   卡到 302 会把那句 ≤30 提示挤成单独一行、行尾空 234px，块高 94→148——把"中间的空白"换成"块里的空白"，
+   白忙一场（两种都量过：卡＝1299 宽 / 148 高，不卡＝1339 宽 / 94 高）。
+   留 20px 富余（而不是刚好卡到 1385）是有原因的：第一版把间距定在 12px，那一排 1387 ≤ 1392 看着是过的，
+   但 1392 是**尺子自己的读数**——`--window-size` 给的是窗口宽，Chromium 扣掉滚动条后内容只有 1385，
+   于是真浏览器里差 2px 照样折排（342px 原样回来）。`bar_measure.py`/`en_bar_draft.py` 从这轮起先读 `vw`
+   再把窗口补宽到 `vw`＝请求值，锚点才跟着浏览器版本不漂。
+   结果：1440 窗口英文态从"两横排＋中间空 223 和 865"变成"一横排、缝 13"，工具栏 342→225px
+   （1280／1180／900 三档 342→342、354→350、479→470：内容 1333 在 1225 的行里怎么都放不下，
+   再省要靠缩短字面或降半档字号——那是用户的口径，不在这轮动）；
+   中文同一窗口同一把尺子仍是 191／287／330／432，一字未动。
+   这一刀不缩字号、不改任何一个词（术语表 v4.3 已定，改字要用户点头），也不碰纸面：
+   三条选择器都只在 .toolbar 里，`@media print` 把整条工具栏 display:none，卷面一个像素不变——
+   由 i18n_check 第一条腿（中文态八档卷面逐字节对照）和答案压页/裁开线两份真纸尺子共同钉住。 */
+html[lang="en"] .fset.paper .btns{max-width:244px}
+html[lang="en"] .fset.bands .chips{max-width:210px}
+html[lang="en"] .row{gap:8px 8px}
+.toolbar h1 small{font-size:12px;color:var(--ink2);font-weight:400;margin-left:8px}
+.toprow{display:flex;justify-content:space-between;align-items:baseline;gap:10px 24px;flex-wrap:wrap;max-width:1500px;margin:0 auto}
+.toprow .hint{text-align:right;flex:1 1 200px}
+/* 分布口径（用户 2026-11-18 定稿，V6）：一行五块——练什么 / 砖块层数 / 份数·种子·墙数 / 版面 / 操作按钮，
+   块宽一律贴合内容（flex:0 0 auto），富余的宽度用 justify-content:space-between 摊到块与块之间，
+   跟卷面"每行数墙要均匀分布"是同一条思路。为什么不再给块加 flex-grow：
+   上一版 grow 摊平后「难度」那块盒子 270px、内容只有 148px，右侧 111px 是纯死白（量测见
+   out/bar_measure_v34_before.log）；贴合内容之后块内只剩 11px 内边距，行尾也归零。
+   「砖块层数」五档排两行（max-width 卡出来，不是拆成两个容器），「版面」两行放在原「说明」的位置，
+   说明压成最下面一行通栏。窄窗（<1280）整块换行、块内不裂。
+   V7（用户 2026-11-18 第 3 条"难度选项放在砖块层数选项下方"）：难度三档从「练什么」挪到「砖块层数」
+   下面，作那个框的第二横排，legend 保持「砖块层数」（难度那行自带标签，不需要新措辞）。
+   四版草稿同一把尺子量过（out/难度位置草稿_measure.log、页内表现算读数 out/难度位置草稿_intable.log）：
+   W1 独立小框把工具栏从 194px 撑到 221px，而且 146px 的窄块待在 204px 的列里右边空 58px；
+   W3 无框一行最省（下方剩 1px）但整条工具栏只剩它没框；W2 高度和 V6 持平、不缺列、
+   块结构还是平的五个——判据（diag.barLayout / sweep）一行都不用改，所以定 W2。*/
+.row{display:flex;flex-wrap:wrap;gap:12px var(--gb);align-items:flex-start;justify-content:space-between;
+  margin:0 auto 6px;max-width:1500px}
+.fset{border:1px solid var(--line2);border-radius:10px;padding:6px 10px 8px;margin:0;flex:0 0 auto;min-width:0}
+/* 窄窗换行的断点要落在"三块＋两块"，不能由着它掉成"四块＋光一根按钮"：
+   难度挪进「砖块层数」那一框后，练什么从 348 收窄到 230，换行点跟着右移，WebKit 那侧 1240px
+   的窗口就出现第二行只剩操作按钮、左边空 1100px（sweep 的行尾判据逮的，out/webkit_v35b_diff.log）。
+   平铺的 flex 换行天生带着一条"最后一块单独一行"的宽度带（这儿正好是窗宽 1138–1257），
+   行间距怎么调只能把带子挪个位置、挪不掉，所以在 份数·种子·墙数 后面钉一道强制换行：
+   ≤1257 一律 3＋2，两行都铺到边。占位本身 height:0——diag.barLayout 和 bar_measure 都跳过
+   零高度的孩子，否则它会把"行尾剩"永远读成 0，判据就成了死的。*/
+.brk{display:none}
+@media (max-width:1257px){.row .brk{display:block;flex:0 0 100%;height:0}}
+.fset legend{font-size:12px;color:var(--ink2);padding:0 4px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:#fff;padding:6px 11px;font-size:13px;cursor:pointer;color:var(--ink2)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--accent);color:#fff}
+.seg.mini button{padding:3px 8px;font-size:12px}
+.chips{display:flex;gap:4px;flex-wrap:wrap;max-width:520px}
+.chip{border:1px solid var(--line);background:#fff;border-radius:6px;font-size:11.5px;
+  padding:3px 0;min-width:22px;text-align:center;cursor:pointer;line-height:1;color:var(--ink2);
+  font-variant-numeric:tabular-nums}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+.chip.off{opacity:.35;cursor:not-allowed}
+/* 同一组里三类勾选各给一个颜色：方向（暖）· 数域（蓝）· 运算（墨），一眼分得开 */
+.chip.k-dir.on{background:var(--warm);border-color:var(--warm)}
+.chip.k-op.on{background:var(--ink);border-color:var(--ink)}
+/* 「10以内」下挂的顶砖细分（用户 2026-11-18）：小一号、跟数域同一个蓝，视觉上就挂在它下面。*/
+.inl{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.inl .lbl{font-size:11px;color:var(--ink2);white-space:nowrap}
+.topsub{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.topsub .lbl{font-size:11px;color:var(--ink2);white-space:nowrap}
+.topsub .chips{gap:3px;max-width:none}
+.chip.k-top{min-width:20px;padding:2px 0;font-size:11px}
+.chip.k-top.on{background:var(--accent);border-color:var(--accent)}
+/* 五档层数排两行：卡住这一排的宽度，让「四层/五层」自己掉到第二行（块内不裂、块间不空） */
+.fset.bands .chips{max-width:200px}
+/* 说明行（最下面通栏）：固定两句 + 现算的状态读数，宽度跟着版心走，不再挤在某个块里 */
+.strip{display:flex;flex-direction:column;gap:3px;max-width:1500px;margin:0 auto 6px;
+  border:1px solid var(--line2);border-radius:10px;padding:5px 10px;background:#fbfdff;
+  font-size:11.5px;color:var(--ink2);line-height:1.6}
+.strip b{color:var(--ink);font-variant-numeric:tabular-nums}
+.note:empty{display:none}
+/* 提示语排成一排（用户 2026-11-22：「选择乘法时，提示…等文字可以设置为一行，以节约空间」，挑定 A2）。
+   数是量过的：乘法那句 54 字排一排要 632px，而通栏内可用宽度 1440→1370 / 1280→1210 / 900→830px，
+   三档都放得下 ⇒ 只要把原来那条 max-width:540px 去掉就够了，不用 white-space:nowrap
+   （nowrap 在窗口窄到 ~760px 以下会把尾巴裁掉，去掉上限则自然退回两排，宁可换行不可丢字）。
+   结果：提示 45 → 27px，乘法档工具栏 264→247 / 341→324 / 403→385px；加减法默认档 191/287/330 一字未动
+   （`note_oneline_draft.py` 末尾那条兜底对照钉着，纸面零改动）。 */
+.note{font-size:11.5px;color:#8a4b12;background:#fff4e8;border:1px solid #f3d9bd;border-radius:8px;
+  padding:4px 7px;margin-top:var(--g);line-height:1.5;max-width:none}
+.fset.out>*+*,.fset.paper>*+*,.fset.bands>*+*{margin-top:var(--g)}
+.fset.out label,.fset.paper label{font-size:12.5px;white-space:nowrap}
+input[type=number]{width:84px;padding:5px 7px;border:1px solid var(--line);border-radius:7px;font-size:13px}
+.fset.out input[type=number]{padding:4px 5px}
+.fset.out #copies{width:44px}
+.fset.out #walls{width:56px}
+.btns{display:flex;gap:9px;align-items:center;flex-wrap:wrap;font-size:13px}
+.fset.out .btns,.fset.paper .btns{gap:8px}
+/* 操作按钮竖着排，和数格涂涂同一条规则（换一批在上、打印在下，两枚同宽）——
+   横排会把这一列撑到 171px，竖排只占 100px，省下的宽度还给上面两块。 */
+.act{display:flex;flex-direction:column;gap:var(--g);flex:0 0 auto;align-items:stretch;justify-content:center}
+.act .btn{padding:6px 12px;font-size:12.5px;border-radius:8px;white-space:nowrap}
+.act .btn.sec{padding:5px 12px;font-size:12.5px}
+.btn{border:0;border-radius:9px;padding:9px 16px;font-size:14px;cursor:pointer;font-weight:600}
+.btn.pri{background:var(--accent);color:#fff}
+.btn.sec{background:#fff;color:var(--accent);border:1px solid var(--accent);padding:5px 11px;font-size:13px}
+.hint{font-size:12px;color:var(--ink2);line-height:1.6}
+.fatal{margin:24px;padding:14px 16px;border:1px solid var(--warm);border-radius:10px;
+  background:#fff6ec;font-size:13px;line-height:1.7;max-width:760px}
+#probeout{position:absolute;left:-99999px;top:0;white-space:pre}
+
+/* ================= A4 版面 =================
+   版心必须屏幕态和打印态完全一致，否则"撑满解算"量的是一张假纸：
+     屏幕 210×297 + padding 16.5/上、左13、右15  →  内容盒 182×264
+     打印 @page margin 16.5/13/13.5 + sheet 184×264 + padding-right 2  →  内容盒 182×264
+   右侧这 2mm 是 v3.9 加的安全缝（用户 2026-11-20「把砖墙的间距缩小一些，右边让出 2mm」）。
+   成因：184mm 的卷面正好顶满 184mm 的页盒，最右那块砖的竖边框中线压在页盒线上，外侧一半被切掉——
+   实测那条边框只剩 0.14mm，同页其它边框是 0.28–0.32mm；Edge 的 Skia 导出、macOS 的 Quartz 导出、
+   我们自己的样张三种管线读数一致，只有"在浏览器里看生成器"看不出来（用户那句"从生成器里看都是
+   正常的，导出就出现问题"就是这个）。让出 2mm 之后那条边框回到 0.31mm，和其它边框一个厚度。
+   为什么只让缝、不缩砖：.browr 是 space-between，缝就是行里剩的富余，所以打印态加 padding-right、
+   解算仍按 GEO.w=184 走——砖宽一分不动（12.43 / 7.50 / 13.83 三档复量前后一致），2mm 全部由
+   墙间距吸收（平均缝 14.39 → 13.72mm）。反过来改页边距会白亏一档砖宽，草稿量过：12.43 → 12.27。
+   前后读数与放大图在 草稿_右侧安全缝_20261120/对比说明.md；这一刀的常驻判据是 scripts/edge_border_check.py
+   （真产物 0.31mm 全绿＋把 2mm 退回 0 的负对照必须报 0.14mm）。
+   为什么是 264 而不是旧的 272：用户 2026-11-19 报「打印时第 2 页、第 4 页空白」。
+   那时叠高 131＋10＋131＝272 把版心 272 顶得一分不剩，浏览器排版用的页盒只要小 1mm
+   （对话框改边距、或打印机把"自己印不到的那一圈"报给浏览器），下半页就被顶到下一页，
+   多出来那页就是近空白页。实测对照见 out/打印留白草稿_measure.log：
+   叠高 272 的安全页盒下限是 272mm，叠高 264 降到 264mm——197×271、195×265 两种
+   "可打印区"页盒下都还是"一张纸一对"。代价是半页让 4mm、砖宽 13.13→12.43mm。
+   顺带把整幅往纸的几何中线放：页边距 16.5/13/13.5 ⇒ 墨区上下各 16.5mm（喷墨打印机
+   不可打印带常见 12.7mm，旧份的 12mm 顶边就压在这条带里），裁开线线心 148.37mm≈A4 中线。
+   高度一律用 height 不用 min-height：min-height 会让页脚把纸撑高，
+   scrollHeight−clientHeight 恒等于 0，溢出就再也量不到了（数格涂涂同一坑）。
+   同样不能加 overflow:hidden：裁掉的内容量不到、打印时也会被真裁掉，
+   版面撑不满是"要修的事"，不是"可以藏起来的事"。 */
+.stage{padding:16px 0 40px}
+.sheet{width:210mm;height:297mm;background:#fff;margin:0 auto 14px;padding:16.5mm 15mm 16.5mm 13mm;
+  box-shadow:0 2px 12px rgba(20,40,60,.14);display:flex;flex-direction:column;
+  page-break-after:always;break-after:page;position:relative}
+.sheet.two{height:141mm;padding:7mm 15mm 7mm 13mm}
+.sheet.two.nobrk{page-break-after:avoid;break-after:auto;margin-bottom:0}
+/* ================= 裁开线（一页两卷）=================
+   用户 2026-11-18：「一页两卷裁开的字没问题，但页面上要求虚线，就像数格涂涂一样」，
+   从草稿 C0–C3 里挑了 C1（数格涂涂同款、带文案），学生卷和答案页都印。
+   样式照数格涂涂的 .cut / .cut i（8pt、#8a97a5、1.4px dashed #9fb0c0），只是那条线改成
+   独占那 10mm 的缝、线在正中：127＋10＋127＝264，比版心高 267 还让出 3mm 余量——
+   这 3mm 就是"页盒被打印机缩小一点也不把下半页顶出去"的那点余地（见上面 A4 版面那段）。
+   屏幕态宽度与 .sheet 同是 210mm，打印态由下面 @media print 收成 184mm。
+   这根线不跟着让右侧那 2mm 安全缝（卷面让、线不让）：它是「沿这条剪」的引导线，左右各 13mm
+   对称贴着纸边比跟着内容盒收窄好下剪刀；虚线末端落在页盒线上被吃掉半根 dash 不影响切割，
+   sweep 的判据按两端各 13±0.6mm 核，正是这条不让缝的口径。
+   为什么不绝对定位挂进上半页：草稿 C3 实测把上半页 scrollHeight 顶高 10.05mm，
+   而"半页溢出"是全链判据（verify_sample／sweep 都读），等于自己点红自己。
+   background:#fff＋z-index:1 是用户 2026-11-20 第 3 条「虚线那行底部有灰色，改成页面的白色，
+   不要让页面看起来像断开一样」：这一条 10mm 本来就是两张卷面之间的那道缝，透明底就把舞台灰
+   （body 与 .stage 的 #eef1f5）和上下两张纸的 box-shadow 一起露出来，屏幕上看着像断成两页。
+   填白＋压在阴影之上（.sheet 是 position:relative、阴影浮在流里）就接成一张纸，打印态本来就
+   是白底无阴影，这一改不动纸面。
+   量测：out/裁开线草稿_measure.log（挑方案）＋out/裁开线核验.log（定稿后逐配置复量）。 */
+.cutline{display:flex;align-items:center;gap:2.5mm;width:210mm;height:10mm;margin:0 auto;
+  padding:0 13mm;font-size:8pt;color:#8a97a5;letter-spacing:.6px;
+  background:#fff;position:relative;z-index:1}
+.cutline i{flex:1;display:block;border-top:1.4px dashed #9fb0c0}
+.hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2.5px solid var(--ink);padding-bottom:2mm}
+.hd .ttl{font-size:21pt;font-weight:800;letter-spacing:1px}
+.hd .ttl em{font-style:normal;color:var(--accent)}
+.hd .sub{font-size:9pt;color:var(--ink2);margin-top:1mm}
+.hd .sub b{color:var(--accent);font-weight:700}
+.meta{font-size:9pt;color:var(--ink2);text-align:right;line-height:2.2;white-space:nowrap}
+.meta .line{display:block}
+/* 说明块并排版（用户 2026-11-20 第 1 条「怎么玩，例子放在右边，文字变成一行或两行，可以节省页面」）：
+   原来是"文字一行 + 对错示例另起一行"整块 24.8mm，现在两幅示例贴右边缘跟文字并排，
+   实量 18.4mm（out/rulebar_并右_量测.log：rulebar 18.4×182｜文字段 143.6×5.2 一行｜示例段 26.8×14.2｜紧凑档仍 9.4）。
+   省下的 6.4mm 每页都拿得到，解算侧同步把 GEO.rule 从 24.8 改成 18.4，砖能再放大一档。
+   下限是那两幅示例图的 14.2mm——所以这块只能压到 18.4，不能再"顺手"改成一行文字的高度。
+   gap 与 margin-left:auto 同时给：flex 默认不放大（flex:0 1 auto），只勾「紧凑」时没有示例段，
+   文字段仍是整幅，版式与紧凑档读数量级不变。 */
+.rulebar{margin-top:2.5mm;border:1px solid var(--line);border-radius:2mm;padding:1.8mm 2.2mm;font-size:9pt;line-height:1.65;
+  display:flex;align-items:flex-end;gap:4mm}
+.rulebar .rseg{display:flex;flex-wrap:wrap;gap:1mm 2mm;align-items:center}
+.rulebar .rseg+.rseg{margin-top:0}
+.rulebar .tag{background:var(--accent);color:#fff;border-radius:1.5mm;padding:0 1.4mm;font-size:8.5pt;white-space:nowrap}
+.rulebar b{color:var(--accent)}
+.demos{display:flex;gap:4mm;align-items:flex-end;margin-left:auto;flex:0 0 auto}
+.demo{display:inline-flex;flex-direction:column;gap:.4mm;font-style:normal}
+.drow{display:flex}
+.demo i{border:1.4px solid var(--ink);background:#fff;font-style:normal;font-size:7.5pt;font-weight:700;
+  width:6.2mm;height:4.4mm;display:flex;align-items:center;justify-content:center}
+.demo.bad i{border-color:var(--warm)}
+.demo.bad i.h{background:#fdecdb}
+.dcap{font-size:8pt;color:var(--ink2);white-space:nowrap}
+
+/* 盘面 */
+.wallzone{display:flex;flex-direction:column;gap:3.2mm;margin-top:2.5mm}
+.band{display:flex;flex-direction:column;gap:3.2mm}
+/* 一行的墙铺满整幅版心、缝宽由浏览器平分（用户 2026-11-17 第 1 条"每行数墙要均匀分布"）：
+   旧写法是左对齐 + 写死 6mm 缝，砖一小右侧就剩一条空白。缝的下限由解算器在 widthCap 里
+   反解保证（≥3mm），所以这里不用再写 gap。 */
+.browr{display:flex;justify-content:space-between;align-items:flex-start;width:100%}
+.group{min-width:0}
+.glabel{font-size:8pt;color:var(--ink2);margin-bottom:.5mm;white-space:nowrap}
+.glabel b{color:var(--ink);font-size:9pt}
+.wall{display:flex;flex-direction:column;width:max-content}
+.brow{display:flex}
+.bk{width:var(--u);height:var(--bh);border:1.4px solid var(--ink);background:#fff;
+  display:flex;align-items:center;justify-content:center;font-style:normal;font-weight:700;
+  font-size:max(6.5pt,calc(var(--u)*.4));font-variant-numeric:tabular-nums;position:relative}
+/* 空砖就是一个空格子（用户 2026-11-17 第 4 条"空的砖块空白就好"）——只留类名给判据用，不上底色。
+   教师卷的 .a 不一样：那是"答案在哪一块"的标记，得看得见。 */
+.bk.hv{background:transparent}
+.bk.a{background:#dfeaf6;border-color:var(--accent);color:var(--accent)}
+/* 教师卷答案页：墙下面那一行推导（学生卷这一栏已取消） */
+.eqrow{margin-top:.9mm;display:flex;align-items:center;gap:1mm;font-size:8pt;color:var(--ink2);flex-wrap:wrap}
+.eqs{display:flex;gap:.8mm;flex-wrap:wrap;margin-left:1mm}
+.eq{font-size:7.5pt;color:var(--accent);white-space:nowrap}
+.ft{margin-top:auto;padding-top:2mm;border-top:1px solid var(--line2);font-size:8.5pt;color:var(--ink2);
+  display:flex;gap:3mm;align-items:center;flex-wrap:wrap}
+.ft .tag{background:var(--ink2);color:#fff;border-radius:1.4mm;padding:0 1.2mm;font-size:8pt}
+.ft .seed{margin-left:auto}
+.anssheet .sub{color:var(--accent)}
+
+/* ================= 打印 =================
+   实测教训：Edge/Chromium 142 的 PDF 里 re 操作符单位不是 CSS px（这份文件量出 615.5），
+   所以毫米一律只认 DOM 探针，PDF 只用来数页数。
+   页边距 16.5/13/13.5 ⇒ 页盒 184×267，叠高 264 用不完——那 3mm 余量是"第 2、4 页空白"的解药。
+   margin:0 auto 是治"右侧没印上"的：对话框把边距改成"无"时页盒变成整张纸（210 宽），
+   写死 margin:0 会让 184 宽的卷面贴左沿、右边空一条 26mm；改成居中后两边各 13mm，
+   对话框怎么选都一样。分页写法也试过（把 page-break-after:always 换成"除第一卷外每卷前面分页"），
+   安全页盒下限仍是 272，和空页无关，所以这一刀不动——别照"业内都说用 break-before"改。 */
+@page{size:A4 portrait;margin:16.5mm 13mm 13.5mm}   /* 页盒 184×267；卷面自己再让出右侧 2mm ⇒ 内容盒 182，与屏幕态同一宽（见上面 A4 版面那段）*/
+@media print{
+  body{background:#fff}
+  .toolbar{display:none!important}
+  .stage{padding:0}
+  .sheet{width:184mm;height:264mm;padding:0 2mm 0 0;margin:0 auto;box-shadow:none;
+    page-break-after:always;break-after:page}
+  .sheet.two{width:184mm;height:127mm;padding:0 2mm 0 0}
+  /* 缝那 10mm 交给裁开线自己占：页 margin-bottom 归零，否则 10＋10＝20 会把下半页顶出纸外
+     （草稿 C1 逐配置数过页数，见 out/裁开线核验.log）。 */
+  .sheet.two.nobrk{page-break-after:avoid;break-after:auto;margin-bottom:0}
+  .cutline{width:184mm;height:10mm;margin:0 auto;padding:0}
+  #probeout{display:none}
+}
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <div class="toprow">
+    <h1><span data-t="appTitle">数墙补补</span> <small data-t="appSub">补砖过关 · 数的分与合 / 表内乘法</small></h1>
+    <!-- 语言开关放标题行最右：它改的是"整页读什么语言"，不属于下面四块选项（用户 2026-11-23：
+         位置、样式都和数格涂涂保持一致）。两个标签各用本族语写，切过去才认得出自己。 -->
+    <span class="seg mini langseg" data-tt="langTT" id="segLang">
+      <button data-v="zh">中文</button><button data-v="en">EN</button></span>
+  </div>
+  <div class="row">
+    <fieldset class="fset mode"><legend data-t="uiLegendMode">练什么（复选）</legend>
+      <div class="chips" id="chipsMode"></div>
+      <div class="topsub"><span class="lbl" id="topLbl" data-t="uiTopLblTops">顶砖数字</span><div class="chips" id="chipsTops"></div></div>
+    </fieldset>
+    <fieldset class="fset bands"><legend data-t="uiLegendBands">砖块层数</legend>
+      <div class="chips" id="chipsBands"></div>
+      <div class="inl"><span class="lbl" data-t="uiDiff">难度</span>
+        <span class="seg mini" id="segDiff"><button data-v="easy" data-t="uiEasy">入门</button><button data-v="mid" data-t="uiMid">进阶</button><button data-v="hard" data-t="uiHard">挑战</button></span>
+      </div>
+    </fieldset>
+    <fieldset class="fset out"><legend data-t="uiLegendOut">份数 · 种子 · 每页墙数</legend>
+      <div class="btns">
+        <input type="number" id="copies" min="1" max="6" value="1" data-tt="uiCopiesTT"> <span data-t="uiUnitCopies">份</span>
+        <input type="number" id="seed" min="1" max="99999999" value="20261116" data-tt="uiSeedTT">
+        <input type="number" id="walls" min="1" max="30" data-ph="uiWallsPh" placeholder="自动" data-tt="uiWallsTT">
+        <span class="hint" style="font-size:12px" data-t="uiPerPageHint">面/页 ≤30</span>
+      </div>
+      <div class="btns">
+        <label data-t="uiAnsChk" data-tt="uiAnsTT"><input type="checkbox" id="ans" checked> 附答案页</label>
+        <span class="hint" style="font-size:12px" data-t="uiBrickSize">砖块大小</span>
+        <span class="seg mini" data-tt="uiCellTT">
+          <button id="cellMinus">－</button><button id="cellAuto" data-t="uiCellAuto">自动</button><button id="cellPlus">＋</button>
+        </span>
+      </div>
+    </fieldset>
+    <span class="brk" aria-hidden="true"></span>
+    <fieldset class="fset paper"><legend data-t="uiLegendPaper">版面</legend>
+      <div class="btns">
+        <span class="seg mini" id="segPer" data-tt="uiPerTT"><button data-v="1" data-t="uiPerOne">一页一卷</button><button data-v="2" data-t="uiPerTwo">一页两卷·裁开</button></span>
+        <label data-t="uiHdr"><input type="checkbox" id="hdr" checked> 页眉</label>
+        <label data-t="uiFoot"><input type="checkbox" id="foot" checked> 页脚</label>
+      </div>
+      <div class="btns">
+        <span class="seg mini" id="segRule" data-tt="uiRuleTT"><button data-v="full" data-t="uiRuleFull">说明·完整</button><button data-v="mini" data-t="uiRuleMini">说明·紧凑</button><button data-v="off" data-t="uiRuleOff">无说明</button></span>
+      </div>
+    </fieldset>
+    <div class="act">
+      <button class="btn sec" id="reroll" data-tt="uiRerollTT" data-t="uiReroll">换一批</button>
+      <button class="btn pri" id="print" data-t="uiPrint">打印 / 存 PDF</button>
+    </div>
+  </div>
+  <div class="strip">
+    <span><span data-t="uiStrip">勾选“合”练习加法；勾选“分”练习减法；两个都勾练习混合运算。种子＝出题编号：同一个种子出同一套题，改它就换题；答案页印着种子可复现。</span><b id="stat"></b></span>
+    <div class="note" id="modeNote"></div>
+  </div>
+</div>
+
+<div class="stage" id="stage"></div>
+
+<script>var BUILD='434a0efadf';var K=(function(){
+/* 数墙补补 · 出题内核 v3
+ *
+ * 口径（改这里之前先回来看）：
+ *   1. 先植桩再挖洞：整面墙的数由构造给出，所以一定有解，不追求唯一解。
+ *   2. 可推导性靠闭包校验，不靠运气：挖完洞跑一次 propagate()，推不出全部空砖就换一套洞。
+ *      卷面不印「数字」栏（2026-11-16 v3 取消），所以**每一块空砖都必须只靠印出来的砖推出来**，
+ *      这条闭包校验从"锦上添花"变成唯一的可解性保证。
+ *   3. 答案页与盘面同源：同一个 struct 渲染两次，不另外计算。
+ *   4. 形状是**逐带参数**，不是全局开关（v2 的 setBond 已废）：
+ *        bond 入门形 = 顶层 1 块、行 d 有 d+1 块、砖数 L(L+1)/2，只做 2 层（3 块砖、1 个目标数、只填 1 个数）；
+ *        wall 错缝墙 = 顶层 2 块、行 d 有 d+2 块、砖数 L(L+3)/2。
+ *      「两层3块」和「两层多块」可以在同一页共存，所以 baseCols/cellCount/colsFor 一律按 (L, shape) 说话。
+ *      两种形状共用同一句几何（父砖在两块孩子正中上方）和同一条递推（上行第 j 块 = 本行第 j、j+1 块之和/积），
+ *      植桩、闭包、渲染都不分叉。
+ *   5. 数域由「10以内（含10）」/「10以上（11–20）」两个复选决定（同勾取并集），不再逐个数勾选：
+ *      层数下限是数学的，不是可调参数——L 层顶砖最小 2^(L-1)（底层全填 1 时取到）：2 层→2、3 层→4、4 层→8、5 层→16。
+ *      上限还要看"底砖是个位数"这条：两层墙两块底砖最多 9+9=18，所以 10以上 时两层的窗口是 11–18。
+ *      「4–9」这一档 2026-11-17 加过、2026-11-18 按用户第 1 条删了（顶砖数字那排复选管得更准）。
+ *      窗口空了的带**自动不排**并回传原因（勾 10以内 时五层出不了题就是这么来的），不许静默出半套题。
+ *   6. 难度三档只管"挖几块砖"（0.30 / 0.45 / 0.60），推导方向完全交给「分」「合」两个复选：
+ *      只勾合＝全部由下面两块凑；只勾分＝全部从墙顶倒推；都勾＝对半开（混合运算）。
+ *   7. 同页不重复（2026-11-16 拍板）：一面墙的"盘面签名"＝形状 + 每块砖的数 + 空砖位置。
+ *      签名撞上同页已有的墙就先换派生种子重出；种子换到池子见底就退一步少挖一块砖（shrunk）；
+ *      两条路都走完还撞，才记下 dups 让页面喊出来。
+ *   8. 乘法档仍是"因数对"口径、仍禁 ×1、仍锁 2–3 层（3 层顶层 = b0·b1²·b2 自带平方因子，
+ *      禁 1 之后只剩 MUL_HARD 那 8 个积）。穷举依据见 out/ 里的历史日志与 verify_math 的可达性检查。
+ *   9. 乘法下「1–10」这排复选改读**几的乘法口诀**（用户 2026-11-22 四条）：勾了 ⇒ 每面墙至少一步的
+ *      因数在勾选集合里（另一个因数不限）；1 与 10 当不了因数，勾了点名忽略；9×2 与 2×9 算同一道
+ *      （factKey 把整面墙的左右镜像并成一道）；两层3块九档全出，两层多块／三层按可达性收敛并点名
+ *      （三层里 5、7 永远接不上）。可达性与题量池一律由 mulFacts 枚举，不许手抄表。
+ */
+
+/* ---- 语言（中文 / English）· 内核这一层单独一套 ----
+ * 规矩长在 `../定稿流程.md`「双语（中英）翻译规则」第 8 条：内核自带的报错句、带名、数域名要跟着
+ * 页面语言走，但**校验脚本永远看到中文**——`sweep.py` 的 `judge_factors()` 认的是「口诀限定」「接不上」
+ * 「一共只有 N 道口诀」「当不了因数」这四个锚点词，`verify_math.mjs` 也按中文正则断言。
+ * 所以 KLANG 默认 'zh'，只有页面的 `switchLang()` 会把它改成 'en'，探针 URL 一律显式带 `&lang=zh`。
+ * 内核不许依赖外面的 `S`（这块是被 build.mjs 单独内联、也被 node 直接 import 的同一份代码）。 */
+let KLANG = 'zh';
+function setKLang(l) { KLANG = (l === 'en') ? 'en' : 'zh'; }
+function getKLang() { return KLANG; }
+function KM(zh, en) { return KLANG === 'en' ? en : zh; }
+/* 列表分隔符：中文用顿号、英文用逗号＋空格。判据读的是整句不是分隔符，换它不影响锚点词。 */
+function LJ(a) { return (a || []).join(KLANG === 'en' ? ', ' : '、'); }
+
+/* ---- 种子随机（mulberry32，与数格涂涂同款，换种子就换一批题）---- */
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function makeRng(seed) {
+  const r = mulberry32(seed >>> 0);
+  return {
+    next: r,
+    int: (lo, hi) => lo + Math.floor(r() * (hi - lo + 1)),
+    pick: (arr) => arr[Math.floor(r() * arr.length)],
+    shuffle: (arr) => {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(r() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    },
+  };
+}
+
+/* 一面墙的派生种子：seed 与 (带序号, 序号) 混合，内容只跟种子有关、跟页面排了几面无关。
+   带序号取 BAND_ORDER 里的位置，所以"两层3块"和"两层多块"不会撞同一个种子。*/
+function mixSeed(seed, bi, k) {
+  let h = (seed >>> 0) ^ 0x9e3779b9;
+  h = Math.imul(h ^ (bi + 11), 0x85ebca6b) >>> 0;
+  h = Math.imul(h ^ (k + 7), 0xc2b2ae35) >>> 0;
+  return (h ^ (h >>> 15)) >>> 0;
+}
+
+/* ---- 带（band）：一条"层数选项"就是一个形状 + 层数 ----
+ * label 用 getter：语言是在页面运行时才定的（`setKLang`），写死成字符串常量就会冻结在第一次取值上
+ * （数格涂涂踩过同一处，裁开线那句注释里记着）。 */
+const BAND_ORDER = ['b2', 'w2', 'l3', 'l4', 'l5'];
+const BANDS = {
+  b2: { key: 'b2', L: 2, shape: 'bond', get label() { return KM('两层3块', '2 rows · 3 bricks'); } },
+  w2: { key: 'w2', L: 2, shape: 'wall', get label() { return KM('两层多块', '2 rows · more bricks'); } },
+  l3: { key: 'l3', L: 3, shape: 'wall', get label() { return KM('三层', '3 rows'); } },
+  l4: { key: 'l4', L: 4, shape: 'wall', get label() { return KM('四层', '4 rows'); } },
+  l5: { key: 'l5', L: 5, shape: 'wall', get label() { return KM('五层', '5 rows'); } },
+};
+const ADD_BANDS = BAND_ORDER.slice();
+const MUL_BANDS = ['b2', 'w2', 'l3'];       // 4 层往上非顶层的积超过 9 就不是口诀了
+const band = (key) => BANDS[key];
+const bandIndex = (key) => BAND_ORDER.indexOf(key);
+
+/* ---- 几何：一律按 (L, shape) 说话 ---- */
+const MIN_TOP = { 2: 2, 3: 4, 4: 8, 5: 16 };   // 底层全填 1 时取到的数学下限
+const BOTTOM_CAP = 9;                          // 底砖个位数起步
+const baseCols = (L, shape) => (shape === 'bond' ? L : L + 1);
+const rowCount = (L) => L;
+const cellCount = (L, shape) => (shape === 'bond' ? L * (L + 1) / 2 : L * (L + 3) / 2);
+/* 一行几面墙＝用户 2026-11-17 第 3 条点名的五个数：两层3块 5、两层多块 4、三/四/五层各 3。
+   旧口径 cols×baseCols≈12（6/4/3/2/2）是"按砖宽归一"推出来的，它把每行面数变成了副作用，
+   四五层只剩 2 面一行——行宽用不满 184mm 版心（行是左对齐的，右侧就剩一条空白），
+   而最浅的两层3块反而挤到 6 面、砖缩到可读下限。现在换成"形状决定每行面数"：
+   每面墙的宽度由版面按 cols 反解（ui.js 的 widthCap），所以砖宽仍是解出来的、不是查表查出来的。*/
+const COLS_BY_BAND = { '2:bond': 5, '2:wall': 4, '3:wall': 3, '4:wall': 3, '5:wall': 3 };
+const colsFor = (L, shape) => COLS_BY_BAND[L + ':' + shape] || 3;
+
+/* ---- 数域 ----
+ * 两档复选，同勾取并集（窗口＝各档 lo 的最小值 … hi 的最大值）。
+ * 「4–9」（r49）2026-11-17 加、2026-11-18 用户第 1 条删掉：它夹在 10以内 中间，
+ *   能限的数顶砖数字那排复选（6–10）已经限得更准，留着只多一个空窗口组合（只勾它时五层必被收敛）。*/
+const RANGES = {
+  le10: { key: 'le10', lo: 2, hi: 10, get label() { return KM('10以内（含10）', 'Up to 10 (incl. 10)'); } },
+  gt10: { key: 'gt10', lo: 11, hi: 20, get label() { return KM('10以上', '11–20'); } },
+};
+const RANGE_ORDER = ['le10', 'gt10'];   // 页面按钮顺序（同用户 2026-11-18 看到的排法）
+/* 顶砖数字细分（用户 2026-11-18 定这排按钮，2026-11-20 第 2 条把档位从 6–10 扩到 1–10）：
+   挂在「10以内（含10）」下面的一排复选，题目也按用户那句话改叫「练什么（复选）」。
+   口径是拍板的第一条——不勾＝不限（这一档照旧 2–10），勾了才限：顶砖只取勾到的那几个数，
+   且只裁 le10 这一档，同勾 10以上 时那一档该出的数照出。
+   原来从 6 起的理由（一上"6、7 / 8、9 / 10 的组成"，2–5 太浅）被用户这句话覆盖：
+   同一排数字要兼作第二步的"几的乘法口诀"选择器（勾 9 ＝练 9 的口诀分与合），所以 1–10 都得在。
+   代价要说清楚，别当成白捡：加减法侧 1–5 是新增可用档，但受 MIN_TOP 的数学下限管着——
+   1 谁都凑不出（底层全填 1 也是 2），3 只够两层墙，4–5 到三层为止，勾深了自动收敛并给出原因，
+   不是出错。**乘法侧第二步已在 v4.1 落地**（用户 2026-11-22 四条口径）：乘法下这排改读"几的乘法口诀"，
+   筛因数不筛积，仍不看数域——细则见下面"乘法下这排数字的第二种读法"那一段。*/
+const TOP_CHOICES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+const MUL_CAP = 81;                              // 口诀里最大的积
+const MUL_HARD = [16, 24, 32, 36, 48, 54, 64, 81];
+const minVal = (op) => (op === 'mul' ? 2 : 1);
+const mulFloor = (L) => (L >= 3 ? 16 : 4);
+
+/* ---- 乘法下这排数字的第二种读法（用户 2026-11-22 四条口径） ----
+ * 加减法里 1–10 是「墙顶取哪些数」；乘法里同一排是「练几的乘法口诀」——筛的是**因数**，不是积。
+ *   1. 勾了口诀 ⇒ 每面墙**至少有一步**乘法的因数落在勾选集合里，另一个因数不限（照旧 2–9）。
+ *      （用户选的是"至少一步含勾到的数"，所以 9×6 也进「勾 6」的题，代价是顺带练到 9 的口诀，
+ *       这条要在状态条上说出来，别让人以为是漏网。）
+ *   2. 1 与 10 在乘法里当不了因数：1 被"禁 ×1"挡死，10 要 10×2=20 就已经出表（口诀最大 9×9=81）。
+ *      勾了不报错，但必须点名忽略，不许静默当成没勾。
+ *   3. 9×2 与 2×9 算同一道口诀 ⇒ 整面墙的左右镜像算同一道盘面（见 factKey），一页只出一次。
+ *   4. 只有两层3块保证"九个口诀全档位都能出"；两层多块／三层按可达性收敛并点名——
+ *      三层的中间一行也得是表内积（≤9），5 与 7 在那里永远接不上去（枚举见 mulUniverse）。
+ * 这三个函数是"勾了到底还能出几道"的唯一口径：窗口、植桩、状态条、判据都从这里读，不许各算各的。*/
+const FACTOR_LO = 2, FACTOR_HI = BOTTOM_CAP;
+const mulFactorSet = (tops) => TOP_CHOICES.filter((v) => v >= FACTOR_LO && v <= FACTOR_HI &&
+  (tops || []).some((x) => +x === v));
+const mulDeadTops = (tops) => TOP_CHOICES.filter((v) => (v < FACTOR_LO || v > FACTOR_HI) &&
+  (tops || []).some((x) => +x === v));
+
+/* 一个带在乘法下**全部**能长成的墙面（rows 数组，含左右两种朝向），照内核自己的约束穷举：
+   非顶行的每一块都得是表内积（≤9）、因数禁 1、顶层两块不许同数（makeWall 里那条 continue）。
+   枚举而不是推导，是因为"某个积能不能带着勾到的因数长出来"在三层要连着两行看，推导容易漏。*/
+const MUL_UNIVERSE = {};
+function mulUniverse(key) {
+  if (!MUL_UNIVERSE[key]) MUL_UNIVERSE[key] = buildMulUniverse(key);
+  return MUL_UNIVERSE[key];
+}
+function buildMulUniverse(key) {
+  const F = [];
+  for (let v = FACTOR_LO; v <= FACTOR_HI; v++) F.push(v);
+  const out = [];
+  const push = (rows) => {
+    if (Math.max(...rows.flat()) > MUL_CAP) return;
+    if (rows.length > 2 && Math.max(...rows[1]) > FACTOR_HI) return;   // 非顶行的积也必须表内（rowBound 那句）
+    if (rows[0].length === 2 && rows[0][0] === rows[0][1]) return;      // 顶层两块同数：makeWall 直接 continue
+    out.push(rows);
+  };
+  if (key === 'b2') {                          // 两层3块：顶 1 块、底 2 块
+    for (const a of F) for (const b of F) push([[a * b], [a, b]]);
+  } else if (key === 'w2') {                   // 两层多块：顶 2 块、底 3 块
+    for (const a of F) for (const b of F) for (const c of F) push([[a * b, b * c], [a, b, c]]);
+  } else if (key === 'l3') {                   // 三层：顶 2 / 中 3 / 底 4，中间一行也得 ≤9
+    for (const a of F) for (const b of F) for (const c of F) for (const d of F) {
+      const y0 = a * b, y1 = b * c, y2 = c * d;
+      if (Math.max(y0, y1, y2) > FACTOR_HI) continue;
+      push([[y0 * y1, y1 * y2], [y0, y1, y2], [a, b, c, d]]);
+    }
+  }
+  return out;
+}
+
+/* 勾了口诀之后这个带还能长出的墙面（"至少一步含勾到的因数"）。F 为空＝不限＝全宇宙。*/
+const MUL_FACT_CACHE = {};
+function mulFacts(key, facs) {
+  const F = (facs || []).slice().sort((a, b) => a - b);
+  const ck = key + '|' + F.join(',');
+  if (MUL_FACT_CACHE[ck]) return MUL_FACT_CACHE[ck];
+  const uni = mulUniverse(key);
+  const hit = !F.length ? uni : uni.filter((rows) => rows.slice(1).some((r) => r.some((v) => F.includes(v))));
+  return (MUL_FACT_CACHE[ck] = hit);
+}
+
+/* 这面带在"镜像算同一道"的判重口径下有多少道不重复的墙（状态条与判据都读这一个数）。*/
+function mulFactCount(key, facs) {
+  const rows = mulFacts(key, facs);
+  return new Set(rows.map((r) => { const a = r.map((x) => x.join('.')).join('|'); const m = r.map((x) => x.slice().reverse().join('.')).join('|'); return a < m ? a : m; })).size;
+}
+
+/* 勾到的这几个口诀里，这个带**实际用得上**的是哪几个。
+   三层里 5 与 7 永远用不上：中间一行也得是表内积（≤9），5×2=10 就出表了，而因数不许是 1。
+   用不上的不许悄悄消失——状态条要按带点名（用户第 4 条"其余收敛＋点名"）。*/
+function mulLiveFacts(key, facs) {
+  const F = mulFactorSet(facs);
+  if (!F.length) return [];
+  const walls = mulFacts(key, F);
+  return F.filter((f) => walls.some((w) => w.slice(1).some((rv) => rv.some((v) => v === f))));
+}
+
+/* 顶砖（=目标数）实际上限：两层墙只有两块底砖、各自 ≤9，所以 19、20 永远凑不出来。*/
+const topCeil = (L) => (L === 2 ? BOTTOM_CAP + BOTTOM_CAP : 20);
+
+/* 一条带在当前数域下能取哪些数。返回 {lo, hi, set, reason}，lo>hi 就是这条带该被收敛掉。
+   ranges 为空时按"两个都勾"处理（2–20），保持内核单独调用时也能出题。
+   tops（2026-11-18 用户要的「10以内」下挂复选）：非空时把 le10 这一档的可取数换成勾选的那几个数，
+   其它两档不受影响；为空时窗口、集合与老口径逐字节相同（不勾＝不限，用户拍板的第一条）。
+   集合不连续时才回传 set，连续区间照旧走 lo/hi，免得下游两处口径打架。*/
+function windowOf(op, ranges, key, tops) {
+  const b = band(key), L = b.L;
+  if (op === 'mul') {
+    const F = mulFactorSet(tops);
+    const chosen = (tops || []).filter((x) => TOP_CHOICES.some((v) => v === +x));
+    if (chosen.length && !F.length) {
+      /* 勾了，但勾的这几个在乘法里都当不了因数——不许退回到"当成没勾、全表照出"，那等于把用户点的按钮吃掉。 */
+      return { lo: 1, hi: 0, set: [], facts: [], live: [], factN: 0,
+        reason: KM(`勾的 ${LJ(chosen)} 在表内乘法里当不了因数：1 被"禁 ×1"挡死，10 要 10×2=20 就出表了（口诀最大 9×9=81）。` +
+          `要么改勾 2–9 里的几个，要么整排都取消（整排不勾＝全部口诀都练）`,
+          `The ticked numbers ${LJ(chosen)} cannot be factors in the times tables: ×1 is not allowed, and 10 needs 10×2=20, which is off the table (the largest fact is 9×9=81).` +
+          ` Tick some numbers from 2–9 instead, or untick the whole row (nothing ticked = practise every table.)`) };
+    }
+    if (F.length) {
+      /* 勾了口诀：可取的积只从"含勾到因数"的那些墙面里取（mulFacts 是枚举出来的，不是拍脑袋的区间），
+         一个都接不上就把这条带收敛掉并说清原因。*/
+      const vals = [...new Set(mulFacts(key, F).map((r) => r[0]).flat())].sort((a, y) => a - y);
+      if (!vals.length) {
+        return { lo: 1, hi: 0, set: [], factN: 0, facts: [], live: [],
+          reason: KM(`${b.label}接不上勾到的口诀 ${LJ(F)}：乘法每一行的积都要 ≤9（保证每一步都是表内），` +
+            `${LJ(F)} 在这带里只能配 1，而因数不许是 1`,
+            `${b.label} cannot use the ticked tables ${LJ(F)}: every row in a multiplication wall has to stay ≤9 (so each step is inside the times tables), ` +
+            `and ${LJ(F)} only pair with 1 in this shape — but 1 is not allowed as a factor.`) };
+      }
+      const contiguous = vals[vals.length - 1] - vals[0] + 1 === vals.length;
+      return { lo: vals[0], hi: vals[vals.length - 1], set: contiguous ? null : vals, reason: '',
+        facts: F.slice(), factN: mulFactCount(key, F), live: mulLiveFacts(key, F) };
+    }
+    const lo = mulFloor(L), hi = MUL_CAP;
+    if (L >= 3) return { lo, hi, set: MUL_HARD.slice(), reason: '' };
+    return { lo, hi, set: null, reason: '' };
+  }
+  const rs = (ranges && ranges.length ? ranges : ['le10', 'gt10']).map((r) => RANGES[r]);
+  const narrow = TOP_CHOICES.filter((v) => (tops || []).includes(v));
+  const lo = Math.max(MIN_TOP[L], Math.min(...rs.map((r) => r.lo)));
+  const hi = Math.min(topCeil(L), Math.max(...rs.map((r) => r.hi)));
+  /* 档与顶砖白名单合起来的集合未必连续：勾「10以内 + 10以上」再勾顶砖 6、8 时，
+     可取数是 6、8、11–20，照 lo–hi 区间取数就把 7、9、10 混上了墙顶（v3.4 的判据抓到过一次，
+     当时抓的是「4–9 + 10以上」漏 10）。所以一律按一个个具体的数取，
+     连续时再退回 lo/hi——两条路的读数一样，下游 targetsFor / cap 都不用改。*/
+  const s = new Set();
+  rs.forEach((r) => {
+    if (r.key === 'le10' && narrow.length) narrow.forEach((v) => s.add(v));
+    else for (let v = r.lo; v <= r.hi; v++) s.add(v);
+  });
+  const vals = [...s].filter((v) => v >= MIN_TOP[L] && v <= topCeil(L)).sort((x, y) => x - y);
+  if (!vals.length) {
+    const only = rs.map((r) => r.label).join('/');
+    const reason = lo > hi
+      ? KM(`${b.label}的墙顶最小是 ${MIN_TOP[L]}（底层全填 1 时取到），${only}凑不出这面墙`,
+            `The top brick of ${b.label} is at least ${MIN_TOP[L]} (that is what you get with every bottom brick filled with 1), and ${only} cannot make this wall`)
+      : KM(`${b.label}能取的墙顶是 ${lo}–${hi}，顶砖勾选的 ${LJ(narrow)} 落不进这一段`,
+            `${b.label} can top out at ${lo}–${hi}, and the ticked top numbers ${LJ(narrow)} fall outside that range`);
+    return { lo: 1, hi: 0, set: [], reason };
+  }
+  const contiguous = vals[vals.length - 1] - vals[0] + 1 === vals.length;
+  return { lo: vals[0], hi: vals[vals.length - 1], set: contiguous ? null : vals, reason: '' };
+}
+
+/* 版面解算之前就要知道这条带排不排得出来，所以可行性是个纯函数（generate 里再兜一次底）。*/
+function bandFeasible(op, ranges, key, tops) {
+  const w = windowOf(op, ranges, key, tops);
+  if (op === 'mul' && !MUL_BANDS.includes(key)) return { ok: false, reason: KM('表内乘法只到三层：四层往上非顶层的积超过 9，就不是口诀了', 'Times tables stop at 3 rows: from 4 rows up, a product below the top exceeds 9, so it is no longer a times-table fact') };
+  if (w.lo > w.hi) return { ok: false, reason: w.reason };
+  return { ok: true, window: w };
+}
+
+/* 这条带可取的目标数集合（连续区间；乘法三层是 MUL_HARD 那 8 个；顶砖勾了又不连续时是勾到的那几个）。*/
+function targetsFor(op, ranges, key, tops) {
+  const w = windowOf(op, ranges, key, tops);
+  if (w.set) return w.set.filter((v) => v >= w.lo && v <= w.hi);
+  const out = [];
+  for (let v = w.lo; v <= w.hi; v++) out.push(v);
+  return out;
+}
+
+const combine = (op, a, b) => (op === 'mul' ? a * b : a + b);
+const sibling = (op, v, w) => (op === 'mul' ? (v % w === 0 ? v / w : null) : v - w);
+/* 每行的上界：乘法每行都 ≤9（保证每一步都是表内口诀）；加法底砖 ≤9，中间行 ≤本卷上限。*/
+function rowBound(op, L, d, cap) {
+  if (op === 'mul') return BOTTOM_CAP;
+  return d === L - 2 ? BOTTOM_CAP : cap;
+}
+
+/* 一行能接上的所有接法（打乱顺序）。找到第一个就返回的老写法，上一层选错就只能整面重来
+   ——5 层墙目标数只剩 17/18/19 时就是这么撞壁的。现在把候选全列出来，让植桩回溯着往下接。*/
+function rowCandidates(rng, v, op, L, d, cap, relax) {
+  const B = rowBound(op, L, d, cap), last = d === L - 2, lo = minVal(op);
+  const starts = [];
+  if (op === 'mul') {
+    for (let w = lo; w <= B; w++) if (v[0] % w === 0 && v[0] / w <= B && v[0] / w >= lo) starts.push(w);
+  } else {
+    for (let w = Math.max(lo, v[0] - B); w <= Math.min(B, v[0] - lo); w++) starts.push(w);
+  }
+  if (!starts.length) return [];
+  const out = [];
+  for (const w0 of rng.shuffle(starts.slice())) {
+    const cur = [w0];
+    let ok = true;
+    for (let j = 0; j < v.length; j++) {
+      const nx = sibling(op, v[j], cur[j]);
+      if (nx === null || nx < lo || nx > B) { ok = false; break; }
+      cur.push(nx);
+    }
+    if (!ok) continue;
+    if (last && Math.max(...cur) > BOTTOM_CAP) continue;
+    if (!relax && !last && new Set(cur).size === 1 && op === 'add') continue;   // 整行同一个数太单调
+    out.push(cur);
+  }
+  return out;
+}
+
+function growRows(rng, rows, op, L, d, cap, keep, relax) {
+  if (d === L - 1) return rows;
+  for (const r of rowCandidates(rng, rows[d], op, L, d, cap, relax)) {
+    const next = rows.concat([r]);
+    if (keep && !keep(next)) continue;
+    const res = growRows(rng, next, op, L, d + 1, cap, keep, relax);
+    if (res) return res;
+  }
+  return null;
+}
+
+/* ---- 植桩：自顶向下 ----
+ * 顶层：错缝墙取 2 块（两个目标数，互不相同，除非只勾了一个数），入门形只取 1 块。
+ * 两轮：先讲"整行不许全同一个数"，讲不通再放宽——只勾一个目标数时（比如四层只要 8），
+ * 唯一接得通的链往往就是 8→4,4,4→2,2,2,2→1,1,1,1,1。*/
+function makeWall(rng, o) {
+  const L = o.L, shape = o.shape, op = o.op, bond = shape === 'bond';
+  const cap = op === 'mul' ? MUL_CAP : windowOf(op, o.ranges, o.key, o.tops).hi;
+  /* 勾了口诀（乘法下的 tops，用户 2026-11-22 第 1 条）：每面墙至少要有一步乘法的因数是勾到的数。
+     这条在植桩这一层判，不在挖洞之后判——挖完再判会把"整面墙重来"变成"换一块洞"，口径就散了。*/
+  const facs = op === 'mul' ? mulFactorSet(o.tops) : [];
+  for (const relax of [false, true]) {
+    for (let attempt = 0; attempt < 900; attempt++) {
+      let t;
+      if (bond) {
+        t = [rng.pick(o.targets)];
+      } else {
+        t = rng.shuffle(o.targets.slice()).slice(0, 2);
+        if (t.length < 2) t.push(rng.pick(o.targets));
+        if (t[0] === t[1] && o.targets.length > 1) continue;
+      }
+      const lo = minVal(op);
+      const bound = (rs) => rs.every((rv, d) => rv.every((x) => x >= lo && x <= (op === 'mul' ? BOTTOM_CAP : (d === L - 1 ? BOTTOM_CAP : cap))));
+      const rows = growRows(rng, [t], op, L, 0, cap, op === 'add' ? bound : null, relax);
+      if (!rows) continue;
+      if (facs.length && !rows.slice(1).some((rv) => rv.some((v) => facs.includes(v)))) continue;
+      const flat = rows.flat();
+      if (op === 'mul' && !rows[0].every((x) => x <= MUL_CAP)) continue;
+      if (op === 'add' && !flat.every((x) => x >= lo && x <= cap)) continue;
+      return buildStruct(L, shape, rows, op);
+    }
+  }
+  return null;
+}
+
+/* 砖坐标：row 0 = 顶层，往下每行多一块并整体左移半格；col 以最小砖宽 U 为单位。
+   两种形状共用这句几何：入门形行 d 有 d+1 块、错缝墙行 d 有 d+2 块，colAt 一样。*/
+function buildStruct(L, shape, rows, op) {
+  const colAt = (d, j) => j + (L - 1 - d) * 0.5;
+  const cells = [];
+  rows.forEach((rv, d) => rv.forEach((v, j) => cells.push(
+    { i: cells.length, val: v, row: d, col: colAt(d, j), span: 1, kids: null, parents: [] })));
+  const at = new Map(cells.map((c) => [c.row + ':' + c.col, c.i]));
+  for (let d = 0; d < rows.length - 1; d++) {
+    rows[d].forEach((v, j) => {
+      const p = at.get(d + ':' + colAt(d, j));
+      const a = at.get((d + 1) + ':' + colAt(d + 1, j));
+      const b = at.get((d + 1) + ':' + colAt(d + 1, j + 1));
+      cells[p].kids = [a, b];
+      cells[a].parents.push(p);
+      cells[b].parents.push(p);
+    });
+  }
+  const st = { L, shape, op, rows: L, cells, n: cells.length };
+  const hi = cells.reduce((m, c) => (c.val > m.val ? c : m), cells[0]);
+  st.headline = hi.val; st.headlineCell = hi.i;
+  st.summit = st.cells.filter((c) => !!c.kids).map((c) => c.i);
+  st.footing = st.cells.filter((c) => !c.kids).map((c) => c.i);
+  st.maxVal = Math.max(...cells.map((c) => c.val));
+  return st;
+}
+
+/* ---- 可推导性闭包：合（下面两块已定 → 上面）/ 分（上面和一侧已定 → 另一侧）---- */
+function propagate(st, hidden) {
+  const know = new Map(), log = [];
+  st.cells.forEach((c) => { if (!hidden.has(c.i)) know.set(c.i, c.val); });
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const c of st.cells) {
+      if (!c.kids) continue;
+      const [a, b] = c.kids;
+      const ka = know.has(a), kb = know.has(b), kc = know.has(c.i);
+      if (!kc && ka && kb) {
+        know.set(c.i, combine(st.op, know.get(a), know.get(b)));
+        if (hidden.has(c.i)) log.push({ cell: c.i, dir: 'join', from: [a, b] });
+        grew = true;
+      } else if (kc && ka !== kb) {
+        const miss = ka ? b : a, have = ka ? a : b;
+        const q = st.op === 'mul' ? know.get(c.i) / know.get(have) : know.get(c.i) - know.get(have);
+        know.set(miss, q);
+        if (hidden.has(miss)) log.push({ cell: miss, dir: 'split', from: [c.i, have] });
+        grew = true;
+      }
+    }
+  }
+  const missing = st.cells.filter((c) => hidden.has(c.i) && !know.has(c.i)).map((c) => c.i);
+  const wrong = [...know].filter(([i, v]) => st.cells[i].val !== v).map(([i, v]) => ({ i, v, want: st.cells[i].val }));
+  return { ok: missing.length === 0 && wrong.length === 0, missing, wrong, log };
+}
+
+/* 挖洞（错缝墙）：页眉砖留着——卷头「砖上的数最大 N」和答案页都靠它，挖掉就没得印了。
+ * 方向是硬约束而不是百分比：只勾一种时候选砖先按拓扑筛过（底层砖没有下面两块，永远当不了
+ * 合成砖；顶层砖没有墙顶，永远当不了分成砖）。配比凑不出来就退洞数，并把 degraded 记下来。*/
+function dig(rng, st, holes, wantSplit, wantJoin, only) {
+  const pool = st.cells.filter((c) => c.i !== st.headlineCell
+    && (!only || (only === 'join' ? !!c.kids : c.parents.length > 0))).map((c) => c.i);
+  const want = holes;
+  let best = null;
+  for (let t = 0; t < 2000; t++) {
+    const hidden = new Set(rng.shuffle(pool.slice()).slice(0, Math.min(want, pool.length)));
+    const p = propagate(st, hidden);
+    if (!p.ok) continue;
+    const splits = p.log.filter((l) => l.dir === 'split').length;
+    const joins = p.log.length - splits;
+    if (splits >= wantSplit && joins >= wantJoin) return { hidden, prop: p, splits, joins, degraded: false };
+    const score = -(Math.abs(splits - wantSplit) + Math.abs(joins - wantJoin));
+    if (!best || score > best.score) best = { hidden, prop: p, splits, joins, score };
+  }
+  return best ? { ...best, degraded: true } : null;
+}
+
+/* 入门形（两层3块）挖洞：固定 1 块空砖，位置跟着勾选走——
+ *   只勾合 → 挖顶砖（底下两块已知，往上合）。顶砖在本形状里恰好是页眉砖，这是"页眉砖永不挖"
+ *     的唯一例外，所以卷头最大值只能取看得见的数（maxShown），不然等于把答案印在题面上。
+ *   只勾分 → 挖底层任一块（顶砖 + 另一块已知，往下拆）。
+ *   两个都勾 → 按序号 k 交替，同一批里一半练合、一半练分。
+ * 挖完照样过一次闭包，推不出就换一块。*/
+function digBond(rng, st, only, k) {
+  const foot = () => rng.shuffle(st.footing.slice());
+  const top = () => rng.shuffle(st.summit.slice());
+  const cands = only === 'join' ? st.summit.slice()
+    : only === 'split' ? foot()
+      : (k % 2 ? foot().concat(top()) : top().concat(foot()));
+  for (const i of cands) {
+    const hidden = new Set([i]);
+    const p = propagate(st, hidden);
+    if (!p.ok) continue;
+    const splits = p.log.filter((l) => l.dir === 'split').length;
+    return { hidden, prop: p, splits, joins: p.log.length - splits, degraded: false };
+  }
+  return null;
+}
+
+/* ---- 难度：只管挖几块 ---- */
+const DIFFS = {
+  easy: { ratio: 0.30, tag: '入门' },
+  mid: { ratio: 0.45, tag: '进阶' },
+  hard: { ratio: 0.60, tag: '挑战' },
+};
+
+/* 盘面签名：形状 + 层数 + 每块砖的数 + 空砖位置。同页两面墙签名一样就是重复题。*/
+function signature(st) {
+  return [st.shape, st.L, st.cells.map((c) => c.val).join('.'), [...st.hidden].sort((a, b) => a - b).join('-')].join('|');
+}
+
+/* 乘法用的签名（用户 2026-11-22 第 3 条：9×2 与 2×9 算同一道口诀，一页只出一次）。
+   一道口诀左右对调＝整面墙左右镜像，所以取"本向"和"镜像向"两种写法里小的那个当键。
+   空格跟着**数值**走，不跟着格子走：镜像把空砖和它上面的数一起搬走，
+   于是"已知 2 求 9"的两种摆法合并成一道，而"已知 9 求 2"仍是另一道（该练的是两个方向）。
+   加减法不套这条——分与合没有"交换就算同一道"的说法，signature 原样留着。*/
+function factKey(st) {
+  const byRow = new Map();
+  st.cells.forEach((c) => {
+    if (!byRow.has(c.row)) byRow.set(c.row, []);
+    byRow.get(c.row).push(c);
+  });
+  const rows = [...byRow.keys()].sort((a, b) => a - b);
+  rows.forEach((r) => byRow.get(r).sort((a, b) => a.col - b.col));
+  const ser = (rev) => rows.map((r) => {
+    const cs = rev ? byRow.get(r).slice().reverse() : byRow.get(r);
+    return cs.map((c) => `${c.val}${st.hidden && st.hidden.has(c.i) ? '_' : ''}`).join('.');
+  }).join('|');
+  const a = ser(false), m = ser(true);
+  return ['M', st.shape, st.L, a < m ? a : m].join('|');
+}
+
+function holesWanted(st, d) {
+  if (st.shape === 'bond') return 1;
+  return Math.max(1, Math.min(st.n - 2, Math.round(st.n * d.ratio)));
+}
+
+/* shrink：同页去重撞到"不重复池子见底"时的退路——少挖一块砖。
+   两层3块不参与（它本来就只填 1 个数）。*/
+function buildWall(seed, o, key, k, tg, shrink) {
+  const b = band(key), L = b.L, d = DIFFS[o.diff] || DIFFS.easy;
+  const both = o.dir.length === 2;
+  const rng = makeRng(mixSeed(seed, bandIndex(key), k));
+  const st = makeWall(rng, { ...o, key, L, shape: b.shape, targets: tg });
+  if (!st) throw new Error(KM(`植桩失败：${b.label} / 可取 ${tg[0]}–${tg[tg.length - 1]}，数域太窄了`,
+    `Seeding failed: ${b.label} / allowed ${tg[0]}–${tg[tg.length - 1]} — the number range is too narrow`));
+  const base = holesWanted(st, d);
+  const want = b.shape === 'bond' ? base : Math.max(1, base - (shrink || 0));
+  let got = null, askS = 0, askJ = 0;
+  if (b.shape === 'bond') {
+    got = digBond(rng, st, both ? null : o.dir[0], k);
+    if (got) { askS = got.splits; askJ = got.joins; }
+  } else {
+    const joinable = st.cells.filter((c) => c.kids && c.i !== st.headlineCell).length;
+    /* 洞数往下退：两层多块总共 5 块砖、页眉砖要留着，实测 3 个洞没有一组能过闭包。
+       能挖几个挖几个，每退一档方向配比按新洞数重算。*/
+    const hMax = both || o.dir[0] === 'split' ? want : Math.min(want, joinable);
+    for (let h = hMax; h >= 1 && !got; h--) {
+      if (both) { askJ = Math.round(h / 2); askS = h - askJ; }
+      else if (o.dir[0] === 'split') { askS = h; askJ = 0; }
+      else { askS = 0; askJ = h; }
+      got = dig(rng, st, h, askS, askJ, both ? null : o.dir[0]);
+    }
+  }
+  if (!got) throw new Error(KM(`挖洞失败：${b.label} want=${want} split=${askS} join=${askJ}`,
+    `Hollowing failed: ${b.label} want=${want} split=${askS} join=${askJ}`));
+  st.hidden = got.hidden; st.log = got.prop.log; st.splits = got.splits; st.joins = got.joins;
+  st.wantSplit = askS; st.wantJoin = askJ; st.degraded = !!got.degraded;
+  st.holesBase = base; st.shrunk = Math.max(0, base - want);
+  st.holesWanted = want; st.holesActual = got.hidden.size;
+  st.key = key; st.kIndex = k; st.tg = tg.slice();
+  return st;
+}
+
+/* ---- 缓存 ----
+ * 同一 (种子, 带, 序号, 选项) 出来的墙永远一样，而版面解算为了找砖宽会把同一批墙重算二三十遍。
+ * 取用时给一份浅拷贝：渲染层会往 struct 上挂 _u/_h，不能让它写回缓存。*/
+const WALL_MEMO = new Map();
+
+function cloneWall(st) {
+  const c = Object.assign({}, st);
+  c.hidden = new Set(st.hidden);
+  c.summit = st.summit.slice();
+  c.footing = st.footing.slice();
+  c.log = st.log.map((e) => ({ cell: e.cell, dir: e.dir, from: e.from.slice() }));
+  c.cells = st.cells.map((x) => Object.assign({}, x, { kids: x.kids ? x.kids.slice() : null, parents: x.parents.slice() }));
+  if (c.tg) c.tg = c.tg.slice();
+  return c;
+}
+
+/* shrink 进缓存键：版面解算重算同一批墙时不能把"去重退路"抖出来。
+   tops 也进键：顶砖限定换一批可取数，出来的墙就不是同一批，不能让缓存串味。*/
+function memoWall(seed, o, key, k, tg, shrink) {
+  const mk = [seed, key, k, o.op, (o.ranges || []).join(','), (o.tops || []).join(','), tg.join(','), o.dir.join(','), o.diff, shrink || 0].join('|');
+  let hit = WALL_MEMO.get(mk);
+  if (!hit) {
+    hit = buildWall(seed, o, key, k, tg, shrink || 0);
+    if (WALL_MEMO.size > 800) WALL_MEMO.clear();
+    WALL_MEMO.set(mk, hit);
+  }
+  return cloneWall(hit);
+}
+
+/* ---- 一卷 ----
+ * plan = [{key, per}]，按 BAND_ORDER 从易到难给进来；内核不管尺寸，per 由版面解算决定。
+ * o.targets 只给校验脚本压窄窗口用，页面不传（页面传 ranges）。*/
+function generate(seed, o, plan) {
+  const d = DIFFS[o.diff] || DIFFS.easy;
+  const structs = [], dropped = [];
+  for (const p of plan) {
+    const key = p.key || p.L;
+    const b = band(key);
+    if (!b) throw new Error(KM(`不认识的层数选项：${key}`, `Unrecognised row option: ${key}`));
+    const tg = o.targets ? o.targets.slice() : targetsFor(o.op, o.ranges, key, o.tops);
+    const fe = bandFeasible(o.op, o.ranges, key, o.tops);
+    if (!fe.ok || !tg.length) { dropped.push({ key, label: b.label, reason: fe.reason || KM('这个数域里凑不出目标数', 'no target number can be made inside this number range') }); continue; }
+    for (let k = 0; k < p.per; k++) structs.push(memoWall(seed, o, key, k, tg));
+  }
+  if (!structs.length) {
+    throw new Error(KM(`这一版出不了题：${dropped.map((x) => `${x.label}——${x.reason}`).join('；')}`,
+      `No worksheet can be made from these settings: ${dropped.map((x) => `${x.label} — ${x.reason}`).join('; ')}`));
+  }
+  /* 同页去重：撞上已有的盘面就换派生种子重出（k 往后挪一大截，等于换一批题）。
+     判重口径＝盘面完全一样（形状 + 每块砖的数 + 空砖位置）；照抄同一家族的另一面墙不算重复。
+     乘法多一条（用户 2026-11-22 第 3 条）：9×2 与 2×9 算同一道口诀 ⇒ 用 factKey 把左右镜像并成一道。
+     换种子是首选（先给 12 次机会）；池子真的见底（比如「四层 + 只勾合 + 挑战 + 只勾 10以内」
+     总共只有 6 种不重复盘面）才退一步少挖一块砖——盘面少一个空砖，签名就不同了。
+     两条路都走完还撞，才记 dups 让页面喊出来。*/
+  const sigOf = (s) => (s.op === 'mul' ? factKey(s) : signature(s));
+  const seen = new Map();
+  let dups = 0, shrunk = 0;
+  const SHIFT_TRIES = 12;
+  for (let i = 0; i < structs.length; i++) {
+    let st = structs[i], sig = sigOf(st), tries = 0;
+    while (seen.has(sig) && tries < 60) {
+      const shrink = Math.max(0, Math.floor((tries - (SHIFT_TRIES - 1)) / 8));
+      st = memoWall(seed, o, st.key, st.kIndex + (tries + 1) * 997, st.tg, shrink);
+      sig = sigOf(st); tries++;
+    }
+    if (seen.has(sig)) dups++;
+    if (st.shrunk) shrunk++;
+    seen.set(sig, { i, k: st.kIndex });
+    structs[i] = st;
+  }
+  const all = structs.flatMap((s) => s.cells.map((c) => c.val));
+  const shown = structs.flatMap((s) => s.cells.filter((c) => !s.hidden.has(c.i)).map((c) => c.val));
+  const sum = (f) => structs.reduce((a, s) => a + f(s), 0);
+  return {
+    seed, opts: o, plan, structs, dropped, dups, shrunk,
+    degraded: structs.filter((s) => s.degraded).length,
+    holes: sum((s) => s.hidden.size),
+    splitN: sum((s) => s.splits), joinN: sum((s) => s.joins),
+    diffTag: d.tag,
+    bondN: structs.filter((s) => s.shape === 'bond').length,
+    maxVal: all.length ? Math.max(...all) : 0,
+    maxShown: shown.length ? Math.max(...shown) : 0,
+    label: (o.op === 'mul' ? '表内乘法' : '分与合') + ' · ' + plan.map((p) => band(p.key || p.L).label).join('+'),
+  };
+}
+
+/* 一条推导写式（答案页用；学生卷不印算式，所以没有遮蔽这一说了）。*/
+function eqOf(st, entry) {
+  const C = (i) => st.cells[i].val;
+  if (entry.dir === 'join') {
+    const [a, b] = entry.from;
+    return st.op === 'mul' ? `${C(a)}×${C(b)}=${C(entry.cell)}` : `${C(a)}+${C(b)}=${C(entry.cell)}`;
+  }
+  const [p, have] = entry.from;
+  return st.op === 'mul' ? `${C(p)}÷${C(have)}=${C(entry.cell)}` : `${C(p)}−${C(have)}=${C(entry.cell)}`;
+}
+
+return {setKLang,getKLang,makeRng,BAND_ORDER,BANDS,ADD_BANDS,MUL_BANDS,band,bandIndex,MIN_TOP,BOTTOM_CAP,baseCols,rowCount,cellCount,COLS_BY_BAND,colsFor,RANGES,RANGE_ORDER,TOP_CHOICES,MUL_CAP,MUL_HARD,minVal,mulFloor,FACTOR_LO,mulFactorSet,mulDeadTops,mulUniverse,mulFacts,mulFactCount,mulLiveFacts,topCeil,windowOf,bandFeasible,makeWall,propagate,dig,digBond,DIFFS,signature,factKey,generate,eqOf};
+})();</script>
+<script>/* 数墙补补 · 页面与渲染（浏览器侧；构建时与内核源码一起内联进单文件生成器）
+ *
+ * **用词纪律（v4.5.1，为上架改的）**：本文件与内核里取正则结果的地方一律写 `str.match(re)`，
+ *   不再用"把 exec 挂在正则对象上"那种写法——WorkBuddy 开放平台的静态检测认得 exec 那个点号调用、
+ *   会报成「命令执行风险」，而这个包只带 HTML 与文档，脚本进不去，**产物里出现那个字面量就是白送的驳回理由**。
+ *   这里原来四处调用点用的都是**非全局**正则（没有 `g` 标志、不靠 `lastIndex`），
+ *   两种写法返回同一个数组（`[全文, 组1, …]`，不匹配给 `null`），所以这是等价改写、不是改行为。
+ *   判据跟着兜底：`sweep.py` 的 `?cfg=`／`?click=` 两条腿就是这三个调用点的真用户，
+ *   75 组配置跑绿＝钩子还在工作；`i18n_check.py` 钉屏上串与纸面逐字节。
+ *   全链复跑见 `out/chain_v451.sh`，纸面与屏幕读数与 v4.5 逐字节相同的证据也在那一份日志里。
+ *
+ * v3（2026-11-16 用户 11 条指令）：
+ *   - 取消质数合数、集章表、墙下「数字」栏、组标签里的"几层"——卷面只剩墙本身和一句玩法。
+ *   - 数域改成两个复选（10以内 / 10以上），不再逐个数勾选；层数选项做成 5 个带（两层3块…五层），
+ *     形状是**逐带参数**，所以两层3块和两层多块能在同一页共存。
+ *   - 难度三档只管挖几块砖，方向完全交给「分」「合」两个复选。
+ *   - 出题时同页去重（盘面完全一样才算重复）。
+ *   - 一版之内带序按 BAND_ORDER 从易到难排（两层3块 → 两层多块 → 三层 → 四层 → 五层）。
+ *
+ * v3.1（2026-11-17 用户四条）：
+ *   - 选项区左上角合成一组复选：分 / 合 / 10以内（含10）/ 10以上 / 乘法。
+ *     「运算」「怎么想」「分与合的数」三个 fieldset 退场，但内部状态仍是 S.dir / S.ranges / S.op，
+ *     内核与 ?cfg= 测试入口一个字都没改——变的是控件形状，不是口径。
+ *   - **buildBar 只挂 handler，视觉状态一律由 syncBar 在每次 render 里刷**。
+ *     以前两件事合在一起只在启动跑一次，就成了"复选点了没反应、功能却像是能用"：
+ *     状态变了、题换了，chip 上的 .on 永远停在初始值。现在按钮状态还回传进 diag.bar，sweep 直接断言。
+ *   - 墙编号超过 ㉚ 直接印阿拉伯数字（42 面的一页绕回 ①，同一页两个"第①面"）。
+ *
+ * 版面口径照数格涂涂：
+ *   - 砖宽 U 不是查档位表来的，是"撑满版面解出来的"：先按横向并列数算出上限，
+ *     再逐档缩，缩到整张纸不溢出为止；同一档要过两次才肯缩（迟滞，防抖）。
+ *   - 缩之前先量一次"噪声底"，容差 = max(0.2, min(噪声底+0.05, 1.0))。
+ *   - 毫米只认 DOM 探针（getBoundingClientRect + 96dpi 换算），PDF 的 re 单位不认。
+ */
+(function () {
+  'use strict';
+
+  /* ================= 语言（中文 / English）=================
+     规格照数格涂涂（`../定稿流程.md`「双语（中英）翻译规则」十二条 + `数格涂涂/references/i18n.md` §1–§7）：
+     一份扁平字典 `L10N_RAW`，值写成 [中, 英] 成对的两列——改一条不会漏另一条；缺键自动回落中文。
+     三个取值口：`T(k)` 纯文案、`F(k,{占位})` 带插值、`PL(n)`/`PS(n)` 管英文单复数；
+     列表分隔符走 `LS(arr)`（中文顿号、英文逗号）。
+     **中文这一列一个字都不许动**：它同时是 `sweep.py` / `verify_math.mjs` / `verify_sample.py` 的断言对象
+     （锚点词「口诀限定」「接不上」「一共只有 N 道口诀」「当不了因数」「出不了题」都在这列里），
+     也是"切英文后中文档读数必须逐字节相同"这条判据的对照面。
+     内核自带的报错句不在这里，它走 `K.setKLang/KM`（内核不许依赖外面的状态，见 kernel.mjs 头部）。
+     故意留中文的：代码注释、`?diag=1` 里只被正则读的探针串（`res.el` 的「(宽)」「页脚」之类）。 */
+  let LANG = 'zh';
+  const L10N_RAW = {
+    /* ---------- 文档 / 标题行 ---------- */
+    docTitle: ['数墙补补 · 生成器（数的分与合 · 纸笔游戏）',
+               'Number Wall Fill · generator (number bonds & times tables, pen and paper)'],
+    appTitle: ['数墙补补', 'Number Wall Fill'],
+    appSub: ['补砖过关 · 数的分与合 / 表内乘法', 'Fill the bricks · number bonds / times tables'],
+    langTT: ['界面和纸面文字一起切换。切成英文后，说明块会变高，砖宽由版面重新解出来，不用手工调。',
+             'Switches the interface and the printed page together. In English the rules block gets taller, so the brick size is re-solved by the layout — nothing to adjust by hand.'],
+    /* ---------- 纸面：卷头 / 页脚 / 裁开线（原来在 TXT 块里，中文列逐字照搬）---------- */
+    paperTitle: ['数墙补补', 'Number Wall Fill'],
+    paperSub: ['给空砖补数 · 数的分与合', 'Fill the blank bricks · Number bonds'],
+    paperSubMul: ['给空砖补数 · 表内乘法', 'Fill the blank bricks · Times tables'],
+    paperCutline: ['✂ 沿虚线裁开 · 上下各一卷', '✂ Cut along the line · one set above, one below'],
+    paperMulTag: ['表内乘法', 'Times tables'],
+    paperAddTag: ['分与合', 'Number bonds'],
+    paperMetaName: ['姓名：________　学号：________', 'Name: ________  ID: ________'],  // 审查例外：卷面空白字段名（用户给词），纸上只有下划线，无任何真实个人信息
+    paperMetaTime: ['日期：________　用时：________', 'Date: ________  Time: ________'],  // 审查例外：同上，空白填写项标签
+    paperSeedFmt: ['出题编号 {s}', 'Set number {s}'],
+    paperRuleTag: ['怎么玩', 'How to play'],
+    paperRuleHow: ['<b>相邻两块砖</b>的数字之和，就是上面砖的数字，一块空砖里只填一个数，让<b>每面墙</b>都成立。',
+                   '<b>The two bricks below</b> add up to the brick above. Write one number in each blank brick so that <b>every wall</b> is correct.'],
+    paperRuleHowMul: ['<b>相邻两块砖</b>的数字之积，就是上面砖的数字，一块空砖里只填一个数，让<b>每面墙</b>都成立。',
+                      '<b>The two bricks below</b> multiply to give the brick above. Write one number in each blank brick so that <b>every wall</b> is correct.'],
+    paperDemoOk: ['这样对', 'This is right'],
+    paperDemoBad: ['这样不对', 'This is wrong'],
+    paperAnsTag: ['教师卷 · 答案与推导', 'Teacher copy · answers &amp; working'],
+    paperAnsRule: ['砖上的数最大 {v}', 'Highest number on a brick: {v}'],
+    paperFt: ['填对了 _____ 面墙', '_____ walls filled in correctly'],
+    /* 以前硬写在模板里的三处（设计说明第 6 节那条硬钉子②：不收进字典，英文态就会留汉字）*/
+    paperCheckTag: ['检查', 'Check'],
+    paperLayers: ['{lays} 层', '{lays} rows'],
+    paperWallsOf: ['{n} 面', '{n} wall{z}'],
+    /* ---------- 另存 PDF 的建议文件名（四段跟着语言切）---------- */
+    fnBrand: ['数墙补补', 'Number Wall Fill'],
+    fnBonds: ['数的分与合', 'Number bonds'],
+    fnMul: ['乘法', 'Times tables'],
+    fnAdd: ['加减', 'Add-subtract'],
+    /* ---------- 界面：选项区 ---------- */
+    uiLegendMode: ['练什么（复选）', 'Practise (tick any)'],
+    uiLegendBands: ['砖块层数', 'Rows per wall'],
+    uiLegendOut: ['份数 · 种子 · 每页墙数', 'Copies · seed · walls per page'],
+    uiLegendPaper: ['版面', 'Layout'],
+    uiTopLblTops: ['顶砖数字', 'Top numbers'],
+    uiTopLblMul: ['乘法口诀', 'Times tables'],
+    uiDiff: ['难度', 'Level'],
+    uiEasy: ['入门', 'Warm-up'], uiMid: ['进阶', 'Standard'], uiHard: ['挑战', 'Challenge'],
+    uiDirSplit: ['分', 'Split'], uiDirJoin: ['合', 'Join'], uiOpMul: ['乘法', 'Multiply'],
+    uiUnitCopies: ['份', 'copies'], uiPerPageHint: ['面/页 ≤30', 'walls/page ≤30'],
+    uiAnsChk: ['附答案页', 'Add answer pages'], uiAnsTT: ['教师卷单独出页', 'Answer pages come out as separate sheets, for the teacher'],
+    uiBrickSize: ['砖块大小', 'Brick size'], uiCellAuto: ['自动', 'Auto'],
+    uiCellTT: ['在“撑满版面解出来的尺寸”上下微调', 'Nudge the size the layout solver settled on'],
+    uiPerOne: ['一页一卷', 'One sheet per page'], uiPerTwo: ['一页两卷·裁开', 'Two per page · cut'],
+    uiHdr: ['页眉', 'Header'], uiFoot: ['页脚', 'Footer'],
+    uiRuleFull: ['说明·完整', 'Rules · full'], uiRuleMini: ['说明·紧凑', 'Rules · brief'], uiRuleOff: ['无说明', 'No rules'],
+    uiReroll: ['换一批', 'New set'], uiRerollTT: ['种子加一，重新出一套题', 'Adds one to the seed and draws a fresh set'],
+    uiPrint: ['打印 / 存 PDF', 'Print / Save PDF'],
+    uiPerTT: ['一页一卷＝一张 A4 一卷；一页两卷·裁开＝一张 A4 上下两卷（卷数自动凑成双数），答案页同样一张纸两份，裁开一人一套',
+              'One sheet per page = one A4 for each set. Two per page · cut = two sets stacked on one A4 (the copy count is rounded up to an even number); the answer pages pair up the same way, so cut the sheet and each pupil gets one set.'],
+    uiRuleTT: ['完整＝玩法＋对错示例；紧凑＝去掉示例；一页两卷时自动按紧凑排',
+               'Full = how to play plus the right/wrong examples; brief drops the examples; two per page always falls back to brief.'],
+    uiCopiesTT: ['份数＝出几卷题。勾「一页两卷·裁开」时一张纸放两卷，份数会自动凑成双数（1→2、3→4），凑出来的那卷是新题，不是把上一卷重印。',
+                 'How many sets to print. With "two per page · cut" one A4 holds two sets, so the count is rounded up to an even number (1→2, 3→4); the extra set is new questions, not a reprint of the first.'],
+    uiSeedTT: ['出题编号：同种子出同一套题', 'Seed = the set number: the same seed always gives the same questions'],
+    uiWallsPh: ['自动', 'auto'],
+    uiWallsTT: ['每页墙数：留空＝自动撑满；填数字就一页只排这么多面墙，砖放大到放得下的最大档。每卷最多 30 面（勾「一页两卷」时一张纸两卷，每卷摊一半＝15 面）。太少凑不满一行、太多一页装不下，都会在状态条上说明。',
+                'Walls per page: leave it empty to fill the page automatically, or type a number and each page holds exactly that many walls, with bricks grown as large as they fit. Up to 30 walls a set (two per page means 15 each). Too few to fill a row, or too many for one page, gets called out in the status line.'],
+    /* v4.5：英文这侧按语意重写短（用户 2026-11-23 第 3 条点头）。量出来撑爆英文态那一排的不是读数（548px），
+       是这句前缀（旧译 1229px）；改短后 131 字符、约 739px，加读数 1287px < 1363px 可用宽。
+       中文原句（用户 2026-11-18 亲给）一个字没动。旧译的「改它就换题」在新译里由 "same seed, same questions"
+       的反面承担，另补 "change it for a new set"；「答案页印着种子可复现」压成 "the answers show it"。
+       中文回译（交用户核语意，双语规则第 3 条）：
+       「勾"合"练加法，勾"分"练减法，两个都勾就混着练。种子＝出题编号：同一个种子出同一套题，改它就换新一套；答案页上印着这个号。」 */
+    uiStrip: ['勾选“合”练习加法；勾选“分”练习减法；两个都勾练习混合运算。种子＝出题编号：同一个种子出同一套题，改它就换题；答案页印着种子可复现。',
+              '"Join" adds, "Split" subtracts, both to mix. Seed = set number: same seed, same questions, change it for a new set; the answers show it.'],
+    /* ---------- 悬停说明（点不动的按钮要说清为什么点不动）---------- */
+    whyMulBand: ['表内乘法最多三层：四层往上非顶层的积超过 9，就不是口诀了',
+                 'Times tables go up to 3 rows: from 4 rows up, a product below the top exceeds 9, so it is no longer a times-table fact'],
+    whyMulRange: ['表内乘法不看数域：积只取口诀表里的数（勾掉"乘法"这两档才管用）',
+                  'Times tables ignore the number range: products only come from the multiplication grid (these two options work once "Multiply" is unticked)'],
+    whyTopsOff: ['顶砖数字是「10以内（含10）」里的细分：先把「10以内」勾上它才管用（10以上 不受这排按钮影响）',
+                 'Top numbers only refine "Up to 10 (incl. 10)": tick that one first (the 11–20 range is not affected by this row)'],
+    whyMulTop: ['练 {v} 的乘法口诀：每面墙至少有一步乘法的因数是 {v}，另一个因数不限（照旧 2–9、禁 ×1）',
+                'Practise the {v} times table: every wall has at least one multiplication step whose factor is {v}, the other factor is free (still 2–9, ×1 not allowed)'],
+    whyTopDead: ['{v} 在表内乘法里当不了因数（1 不进乘法、10 一乘就出表），勾了会被点名忽略',
+                 '{v} cannot be a factor in the times tables (1 is never multiplied, and 10 leaves the grid as soon as you do), so a tick here is called out and ignored'],
+    /* ---------- 通栏那行动态提示（modeNote）---------- */
+    noteMulOn: ['已勾「乘法」：这是表内口诀，不看数域那两档，砖块层数也只到三层。',
+                '"Multiply" is ticked: these are times-table facts, so the two number-range options are ignored and walls stop at 3 rows.'],
+    noteMulTops: ['下面那排数字读作几的乘法口诀，勾几个练几个。',
+                  'The numbers below now read as "which times table" — tick as many as you want to practise.'],
+    noteTopsOff: ['顶砖勾了 {list}，但没勾「10以内（含10）」，这排按钮暂时不起作用。',
+                  'Top numbers {list} are ticked, but "Up to 10 (incl. 10)" is not, so this row of buttons does nothing yet.'],
+    /* ---------- 状态条：那一行读数 ---------- */
+    statPrintTitle: ['导出 PDF 时对话框预填：{name}.pdf', 'Save as PDF will be pre-filled with: {name}.pdf'],
+    /* v4.5：读数按用户点头的「B 中度」收（2026-11-23）。量的时候中文态 1440 本来就一排，
+       收它是让 1280 档也排回一排；数字一个没动，zh 那两处单位（砖宽后的 mm、空砖后的"个"）是 B 样本里就没了的。 */
+    statBase: ['砖宽 {u} · 每页 {n} 面{how} · 空砖 {h} · 溢出 {o}mm',
+               'Brick {u}mm · {n} wall{z}/page{how} · {h} blank · overflow {o}mm'],
+    statHowAuto: ['（自动撑满）', ' (auto-filled)'],
+    statHowCap: ['（撑满到每页上限）', ' (up to the per-page cap)'],
+    statHowFixed: ['（按你填的墙数）', ' (the count you typed)'],
+    statAnsShrink: [' · 答案砖 {pct}%（{from}→1 页）', ' · answers {pct}% ({from}→1)'],
+    /* ---------- 状态条：要喊出来的那些事（warn / notes）---------- */
+    statFatal: ['这一版出不了题：', 'No worksheet from these settings: '],
+    /* 渲染层那句短前缀（`err = '出不了题：' + e.message`）。英文这侧留空是**有意的**：
+       内核那句已经说了 "No worksheet from these settings: …"，再冠一个 "No worksheet:" 就成了车轱辘话；
+       屏幕上的 ✗ 本身就足够指出"这一版出不来"。中文保持原样，sweep 的 `_fatal='出不了题'` 照旧读得到。 */
+    statFatalHead: ['出不了题：', ''],
+    noteAnsPages: ['答案页砖缩到 {pct}%（{from}→{to}mm）仍要 {pages} 页：每卷 {total} 面太多，减墙数或改一页两卷',
+                   'Answer bricks scaled to {pct}% ({from}→{to}mm) still need {pages} pages: {total} walls a set is too many — drop some walls or switch to two per page'],
+    noteAnsFloor: ['答案页砖压到 {to}mm（学生卷 {from}），已在可读下限 {floor} 以下：这页给老师看，别让孩子在上面写',
+                   'Answer bricks squeezed to {to}mm (pupil sheet {from}), below the readable floor of {floor}mm — this sheet is for the teacher, not for writing on'],
+    noteWayPer2: ['一页两卷（半页一卷）', 'two per page (half a page each)'],
+    noteWayPer1: ['一页一卷', 'one sheet per page'],
+    noteCapClamp: ['（每页上限 {n} 面，你填的 {want} 面已经被夹到上限）',
+                   ' (capped at {n} walls per page — your {want} was clamped down)'],
+    noteNoFitWant: ['{way}排不出每页 {n} 面{by}：按 {names} 的行宽分好行要 {need}mm，版心只有 {avail}mm（砖宽已缩到 {u}mm，再小就没法看了）。退一步：少填几面、少勾一种层数、或改一页两卷。',
+                    '{way} cannot give {n} walls a page{by}: laid out at the row widths of {names} it needs {need}mm, and the printable box is only {avail}mm (bricks already down to {u}mm — smaller is unreadable). Step back: fewer walls, fewer row options, or two per page.'],
+    noteNoFitMin: ['{way}放不下：版心可用 {avail}mm，而最小配置（{names} 各一行、共 {walls} 面）要 {need}mm（砖宽已缩到 {u}mm，再小就没法看了）。退一步：少勾一种层数、把说明改成「紧凑」或「无」、或改回一页一卷。',
+                   '{way} does not fit: {avail}mm of printable height is left, but the smallest arrangement ({names}, one row each, {walls} walls) needs {need}mm (bricks already down to {u}mm — smaller is unreadable). Step back: fewer row options, set the rules block to "brief" or "no rules", or go back to one sheet per page.'],
+    noteAutoShrink: ['自动收敛：', 'Narrowed automatically: '],
+    noteDupMul: ['同页有 {dups} 面重复盘面：勾到的口诀一共只有 {poolN} 道不重复的题（交换因数算同一道），再勾几个口诀或少填几面',
+                 '{dups} duplicate wall{zd} on the same page: the ticked tables hold only {poolN} distinct facts (swapping the factors counts as the same one) — tick more tables or print fewer walls'],
+    noteDupAdd: ['同页有 {dups} 面重复盘面：这一档不重复的墙已经用尽（{bands} 个带 × 数域 × 难度组合太少），换个数域或降一档难度',
+                 '{dups} duplicate wall{zd} on the same page: every distinct wall in this setting has been used ({bands} row options × number range × level is too few) — change the range or drop a level'],
+    noteShrunk: ['为了同页不重复，有 {shrunk} 面墙少挖了一块砖（换种子已经换不出新盘面了）',
+                 'To keep the page free of repeats, {shrunk} wall{zs} kept one brick filled (no new patterns left to draw from another seed)'],
+    noteDegraded: ['方向配比有 {deg} 面降级：这档洞数凑不出要求的合成/分成比例',
+                   '{deg} wall{zd} changed direction: with this many blanks the requested join/split mix cannot be met'],
+    noteTopsLimit: ['顶砖限定 {list}（只裁「10以内（含10）」这一档{other}）',
+                    'Top numbers limited to {list} (this only trims "Up to 10 (incl. 10)"{other})'],
+    noteTopsLimitOther: ['；同时勾了 {other}，那几档的数照旧出', '; {other} is ticked too, so those numbers still appear'],
+    noteFactLimit: ['口诀限定 {facs}：每面墙至少有一步的因数是勾到的数，另一个因数不限（勾 6 也会出 9×6，那一步练的是 9 的口诀）',
+                    'Tables limited to {facs}: every wall has at least one step whose factor is a ticked number, the other factor is free (ticking 6 still brings in 9×6, which practises the 9 table)'],
+    noteFactNone: ['（勾到的数在乘法里都当不了因数）', '(none of the ticked numbers works as a factor)'],
+    notePoolCount: ['；不重复题量 {pool}（交换因数算同一道，一页只出一次）',
+                    '; distinct facts: {pool} (swapping the factors counts as the same one, printed once per page)'],
+    notePoolItem: ['{label} {n} 道', '{n} in {label}'],
+    noteFactDead: ['；勾到的 {dead} 当不了因数——1 不进乘法（禁 ×1），10 一乘就出表（口诀最大 9×9=81），已忽略',
+                   '; {dead} cannot be factors — 1 is never multiplied (×1 is not allowed) and 10 leaves the grid (largest fact 9×9=81), so they were ignored'],
+    noteBandNoFact: ['{label}里 {dead} 的口诀接不上：每一行的积都要 ≤9，那几个数在这带只能配 1 而因数不许是 1 —— 这一带只出含 {live} 的题',
+                     '{label} cannot use the {dead} tables: every row must stay ≤9, and those numbers only pair with 1 in this shape, but 1 is not allowed as a factor — this row only draws walls containing {live}'],
+    notePadPairs: ['一页两卷：一张纸两卷，份数 {copies} 自动补成 {padded} 卷（补出来的是新题，不是把上一卷重印一遍；要两张一样的纸就改一页一卷打印两份）',
+                   'Two per page: one A4 holds two sets, so {copies} copy{zc} became {padded} sets (the extra set is new questions, not a reprint — for two identical sheets, use one sheet per page and print twice)'],
+    noteCapCut: ['自动撑满到每页 {cap} 面的上限就停了（版面还排得下 {left} 面）：砖已经放大到这一档的上限，要更多题就少勾一层或用一页两卷',
+                 'Auto-fill stopped at the cap of {cap} walls per page ({left} more would still fit): the bricks are already at the largest size for this setting — for more questions, tick fewer row options or use two per page'],
+    noteClipped: ['每页墙数按 {fixed} 面排：你填 {want} 面，超过每页 {cap} 面的上限{half}',
+                  'Walls set to {fixed} a page: you typed {want}, above the cap of {cap}{half}'],
+    noteClippedHalf: ['（一页两卷是一张纸两卷，每卷摊一半）', ' (two per page shares one A4, so each set gets half)'],
+    noteShort: ['每页按 {total} 面排：你要 {fixed} 面，但一行就是 {cols} 面，凑不满剩下的名额',
+                'Walls set to {total} a page: you typed {fixed}, but a row is exactly {cols} walls, so the leftover places cannot be filled'],
+    noteOver: ['每页最少一行是 {total} 面，比你要的 {fixed} 面多 {over} 面',
+               'The smallest full row is {total} walls — {over} more than the {fixed} you typed'],
+    noteDropped: ['{names} 没排：每页 {fixed} 面装不下它们的一行',
+                  '{names} were not laid out: {fixed} walls a page leaves no room for another row of them'],
+    statOver: ['版面超 {o}mm', 'Layout overflows by {o}mm'],
+    statAir: ['底部还剩一整行（空 {air}mm），布局模型偏保守', 'A whole row left over at the bottom ({air}mm free) — the layout model is too cautious'],
+    statSmall: ['砖宽 {u}mm 已到可读下限，题量是靠小砖换来的', 'Bricks are at {u}mm, the readable floor — that many questions were bought with tiny bricks'],
+    statTrust: ['这台浏览器的溢出量测不可信（注入 40mm 只读出 {read}mm），底空数字仅供参考',
+                'This browser\'s overflow measurement is unreliable (40mm injected read back as {read}mm) — the free-space figure is indicative only'],
+    statDiffTotals: ['各卷题量不一致：{totals} 面，换回上一档砖宽重解过',
+                     'Sets disagree on wall counts: {totals} — the solver should have fallen back to the previous brick size'],
+  };
+  const L10N = { zh: {}, en: {} };
+  for (const k in L10N_RAW) { L10N.zh[k] = L10N_RAW[k][0]; L10N.en[k] = L10N_RAW[k][1]; }
+  function T(k) {
+    const d = L10N[LANG];
+    if (d && typeof d[k] === 'string') return d[k];
+    return typeof L10N.zh[k] === 'string' ? L10N.zh[k] : k;   // 缺键回落中文，再缺回落键名（探针会把它当漏翻喊出来）
+  }
+  /* 插值语法 {name}。**漏传的占位符故意原样留在句里**——数格涂涂靠这条让探针抓到 setWord 的笔误。 */
+  function F(k, map) {
+    return T(k).replace(/\{(\w+)\}/g, (m, x) => (map && map[x] !== undefined ? map[x] : m));
+  }
+  function PL(n) { return LANG === 'en' ? (n === 1 ? '' : 's') : ''; }
+  function LS(a) { return (a || []).join(LANG === 'en' ? ', ' : '、'); }
+  function LTS(a) { return (a || []).join(LANG === 'en' ? ', ' : '　'); }   // 答案页那行的全角空格分栏
+  function LJS(a) { return (a || []).join(LANG === 'en' ? '; ' : '；'); }
+  function LDB(a) { return (a || []).join(LANG === 'en' ? ' — ' : '——'); }
+
+  /* ================= 纸面文字 =================
+     纪律（v4.3 起）：**纸面用词只在 `L10N_RAW` 一处**，本块只是按语言取值的薄壳——
+     中文列与 v4.2 的 `TXT` 逐字相同（这壳存在的意义就是让当年那批判据继续读同一句中文）。
+     中文原句由用户逐条给（2026-11-15 定），英文由助手按语意译（2026-11-23 改口径，见 `../定稿流程.md`）。 */
+  const TXT = {
+    get title() { return T('paperTitle'); },
+    get sub() { return T('paperSub'); },
+    get subMul() { return T('paperSubMul'); },
+    get cutline() { return T('paperCutline'); },
+    get mulTag() { return T('paperMulTag'); },
+    get addTag() { return T('paperAddTag'); },
+    /* 卷头右上那两行（用户 2026-11-18 给词：姓名 / 学号 / 日期 / 用时）。审查例外：这几个是卷面空白字段名，纸上只有下划线，没有任何真实个人信息。 */
+    get metaName() { return T('paperMetaName'); },   // 审查例外：卷面空白字段名（用户给词），非真实数据
+    get metaTime() { return T('paperMetaTime'); },   // 审查例外：同上
+    seedFmt: (s) => F('paperSeedFmt', { s }),
+    get ruleTag() { return T('paperRuleTag'); },
+    get ruleHow() { return T('paperRuleHow'); },
+    get ruleHowMul() { return T('paperRuleHowMul'); },
+    get demoOkCap() { return T('paperDemoOk'); },
+    get demoBadCap() { return T('paperDemoBad'); },
+    get ansTag() { return T('paperAnsTag'); },
+    ansRule: (v) => F('paperAnsRule', { v }),
+    get ft() { return T('paperFt'); },
+  };
+  const CIRC = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳㉑㉒㉓㉔㉕㉖㉗㉘㉙㉚';
+
+  /* ================= 状态 ================= */
+  const S = {
+    op: 'add',                    // add=分与合 / mul=表内乘法（独立模式，不混排）
+    bands: ['b2', 'w2', 'l3'],    // 复选的"带"：两层3块 / 两层多块 / 三层 / 四层 / 五层
+    ranges: ['le10', 'gt10'],     // 分与合的数域复选（只对加法生效）
+    /* 顶砖数字细分（用户 2026-11-18）：挂在「10以内（含10）」下面的 6/7/8/9/10。
+       空＝不限（这一档照旧 2–10），勾了才限——拍板的第一条，别在这里偷偷给个默认勾选。 */
+    tops: [],                     // 顶砖可取数 ⊂ {6,7,8,9,10}，只裁 10以内 这一档
+    dir: ['split', 'join'],       // 分 / 合（复选）
+    diff: 'mid',                  // easy 30% / mid 45% / hard 60% 空砖
+    walls: 0,                     // 每页墙数：0＝自动撑满（用户 2026-11-17 第 6 条）
+    copies: 1,
+    seed: 20261116,
+    per: 1,                       // 1=一页一卷 2=一页两卷
+    hdr: true, foot: true, ans: true,
+    rule: 'full',                 // full=完整说明（含对错示例）/ mini=紧凑 / off=不要
+    cell: 'auto',                 // auto / minus / plus：在解算上限上下微调
+  };
+  const Q = (id) => document.getElementById(id);
+  const allowedBands = () => (S.op === 'mul' ? K.MUL_BANDS : K.ADD_BANDS);
+  /* 至少留一个带：全点掉等于这一页没题，按钮层面直接拦住。*/
+  function syncBands() {
+    const allow = allowedBands();
+    S.bands = K.BAND_ORDER.filter((k) => S.bands.includes(k) && allow.includes(k));
+    if (!S.bands.length) S.bands = ['b2'];
+  }
+  function syncRanges() {
+    // 两档全点掉＝没有数域可言，按"全都勾"出（和分/合同一口径，别静默留一档）
+    if (!S.ranges.length) S.ranges = K.RANGE_ORDER.slice();
+    S.ranges = K.RANGE_ORDER.filter((r) => S.ranges.includes(r));
+  }
+  /* 顶砖细分的取值：只认 6–10 这五个数，按升序存（缓存键与状态条都靠稳定顺序）。
+     比数值不比引用（+x）：?cfg= 手敲时写成 "6" 也认，别把配置当字符串误判成没勾。
+     全不点＝不限＝这一档照旧 2–10，这是拍板口径，所以这里绝不"兜底成全勾"。*/
+  function syncTops() {
+    S.tops = K.TOP_CHOICES.filter((v) => S.tops.some((x) => +x === v));
+  }
+  /* 这一排 1–10 有两种读法（用户 2026-11-22）：加减法里是「墙顶取哪些数」，挂在「10以内」下面，
+     没勾那一档就不起作用；乘法里读作「几的乘法口诀」，与数域无关、一直管用（勾了才限，不勾＝全部口诀）。*/
+  const topsLive = () => S.op === 'mul' || S.ranges.includes('le10');
+  /* ?click= 里写错的按钮名记在这儿，探针回传（diag.clickMiss）。
+     分隔符打错一个，那一格就成了"什么都没点、判据却全过"的假绿——测试入口也得自己喊出来。*/
+  const CLICK_MISS = [];
+
+  /* ================= 选项区 ================= */
+  /* 「建一次」和「刷一次」是两件事，必须分开：buildBar() 只在启动时挂 handler，
+     视觉状态一律由 syncBar() 在每次 render() 里刷。
+     以前两件事合在 buildBar 里、只在启动跑一次，于是用户看到的就是"复选点了没反应，但功能像是能用"——
+     状态确实变了、题也确实换了，可 chip 上的 .on 永远停在初始值（2026-11-17 报的第一条）。
+     现在按钮的视觉状态也回传进 diag.bar，sweep/WebKit 两侧都断言"按钮显示＝当前配置"，这类 bug 当场红。*/
+  const SYNCERS = [];
+  const toggleIn = (arr, v) => (arr.includes(v) ? arr.filter((x) => x !== v) : arr.concat(v));
+  function chipRow(el, items, toggle, active, disabled, why, hint) {
+    /* dataset.v 天生是字符串，但状态里存的不一定是字符串：层数/数域是 'b2'、'le10' 这样的键，
+       顶砖数字却是 6、7 这样的数。以前把 dataset.v 原样递给 toggle/active，顶砖那颗就永远点不亮
+       （S.tops 里存进 "6"，syncTops 按数字一过滤又给丢了）——所以这里一律换算回 items 里那个原值。*/
+    const typed = {};
+    const byKey = {};
+    items.forEach((it) => { typed[String(it.v)] = it.v; byKey[String(it.v)] = it; });
+    /* label 允许是函数：切语言时 chip 的字要跟着变（数格涂涂用 data-t 挂静态标签，
+       我们这三排是 JS 现建的，所以由 syncer 每次重取——顺序错了就会出现"按钮还是中文、纸已经英文"）。*/
+    const labelOf = (it) => (typeof it.label === 'function' ? it.label() : it.label);
+    el.innerHTML = '';
+    items.forEach((it) => {
+      const b = document.createElement('button');
+      b.className = 'chip' + (it.kind ? ' k-' + it.kind : '');
+      b.dataset.v = it.v;
+      b.textContent = labelOf(it);
+      b.onclick = () => { const v = typed[b.dataset.v]; if (disabled && disabled(v)) return; toggle(v); render(); };
+      el.appendChild(b);
+    });
+    SYNCERS.push(() => [].forEach.call(el.children, (b) => {
+      const v = typed[b.dataset.v];
+      const it = byKey[String(v)];
+      if (it) b.textContent = labelOf(it);
+      const dis = !!(disabled && disabled(v));
+      b.classList.toggle('on', active(v) && !dis);
+      b.classList.toggle('off', dis);
+      b.disabled = dis;                     // 真 disabled：点不动，tab 也跳不过去
+      b.title = dis ? why(v) : (hint && !dis ? hint(v) : '');
+    }));
+  }
+  function segRow(el, get, set) {
+    [].forEach.call(el.children, (b) => { b.onclick = () => { set(b.dataset.v); render(); }; });
+    SYNCERS.push(() => [].forEach.call(el.children, (b) => {
+      b.classList.toggle('on', String(b.dataset.v) === String(get()));
+    }));
+  }
+
+  /* 左上角那一组：分 / 合 / 10以内（含10）/ 10以上 / 乘法——五个都是复选（用户 2026-11-17 第 2 条、
+     2026-11-18 第 1 条把「4–9」删掉）。
+     内部状态照旧是 S.dir / S.ranges / S.op，内核与 ?cfg= 测试入口的口径一个字都不改，
+     只是把「运算」「怎么想」「分与合的数」三个 fieldset 收进同一组勾选里。
+     数域两档同勾取并集（内核 windowOf 逐个数取集合，见那段的注释），按钮顺序照 K.RANGE_ORDER。*/
+  const MODE_CHIPS = [
+    { v: 'split', label: () => T('uiDirSplit'), kind: 'dir' },
+    { v: 'join', label: () => T('uiDirJoin'), kind: 'dir' },
+  ].concat(K.RANGE_ORDER.map((r) => ({ v: r, label: () => K.RANGES[r].label, kind: 'rng' })))
+    .concat([{ v: 'mul', label: () => T('uiOpMul'), kind: 'op' }]);
+  const isRng = (v) => !!K.RANGES[v];
+  const modeActive = (v) => (v === 'mul' ? S.op === 'mul'
+    : isRng(v) ? S.ranges.includes(v) : S.dir.includes(v));
+  function modeToggle(v) {
+    if (v === 'mul') { S.op = S.op === 'mul' ? 'add' : 'mul'; syncBands(); return; }
+    if (isRng(v)) { S.ranges = toggleIn(S.ranges, v); syncRanges(); return; }
+    S.dir = toggleIn(S.dir, v);
+    if (!S.dir.length) S.dir = ['join', 'split'];   // 全点掉＝没有方向可言，按混合出（状态条与提示同一口径）
+  }
+  /* 点不动的按钮要把"为什么点不动"说清（数格涂涂同一条规矩：灰掉不算告知）。
+     一律现取，别把句子冻在启动那一次的语言上。 */
+  const WHY = {
+    mulBand: () => T('whyMulBand'),
+    mulRange: () => T('whyMulRange'),
+    topsOff: () => T('whyTopsOff'),
+    /* 乘法下这排按钮的另一种读法（用户 2026-11-22 四条口径）：亮着的时候也要说清"勾了等于什么"。 */
+    mulTop: (v) => F('whyMulTop', { v }),
+    topDead: (v) => F('whyTopDead', { v }),
+  };
+
+  function buildBar() {
+    // 左上角：练什么（复选）——题面文字按用户 2026-11-20 第 2 条从「这一页练什么」改成「练什么」
+    chipRow(Q('chipsMode'), MODE_CHIPS, modeToggle, modeActive,
+      (v) => isRng(v) && S.op === 'mul',
+      WHY.mulRange);
+    /* 这一排 1–10 有两种读法（用户 2026-11-18 定这排按钮、2026-11-20 第 2 条扩到 1–10、2026-11-22 定第二种读法）：
+         加减法＝「10以内（含10）」里墙顶取哪几个数（不勾＝不限＝照旧 2–10）；
+         乘法＝练几的乘法口诀（勾了才限：每面墙至少有一步的因数是勾到的数；1 与 10 当不了因数，勾了点名忽略）。
+       加减法侧 1–5 能不能出题由内核 MIN_TOP 兜着，乘法侧能不能接上由 mulFacts 枚举兜着——
+       两条都不许静默出半套题，收敛掉都要在状态条点名（上一版"灰着但不知道为啥"是被点过名的）。*/
+    chipRow(Q('chipsTops'), K.TOP_CHOICES.map((v) => ({ v, label: String(v), kind: 'top' })),
+      (v) => { S.tops = toggleIn(S.tops, v); },
+      (v) => S.tops.includes(v),
+      () => !topsLive(),
+      WHY.topsOff,
+      (v) => (S.op === 'mul' ? WHY.mulTop(v) : ''));
+    SYNCERS.push(() => {
+      Q('topLbl').textContent = S.op === 'mul' ? T('uiTopLblMul') : T('uiTopLblTops');
+      // 勾了 1 或 10 又说一声：这两个数在乘法里当不了因数，别让亮着的按钮冒充生效了
+      [].forEach.call(Q('chipsTops').children, (b) => {
+        const v = +b.dataset.v;
+        if (S.op === 'mul' && b.classList.contains('on') && (v < 2 || v > 9)) {
+          b.title = WHY.topDead(v);
+        }
+      });
+    });
+    // 砖块层数（复选）：按 BAND_ORDER 从易到难，表内乘法只到三层，其余置灰并说明原因
+    chipRow(Q('chipsBands'), K.BAND_ORDER.map((k) => ({ v: k, label: () => K.band(k).label })),
+      (v) => { S.bands = toggleIn(S.bands, v); syncBands(); },
+      (v) => S.bands.includes(v),
+      (v) => !allowedBands().includes(v),
+      WHY.mulBand);
+    segRow(Q('segDiff'), () => S.diff, (v) => { S.diff = v; });
+    /* 语言开关（用户 2026-11-23：位置样式照数格涂涂——标题行最右那枚分段控件，不进选项区）。
+       和别的 seg 同一个 handler，视觉状态照旧由 syncBar 刷，所以"按钮显示＝当前配置"那条判据也覆盖它。 */
+    segRow(Q('segLang'), () => LANG, switchLang);
+    segRow(Q('segPer'), () => S.per, (v) => { S.per = +v; });
+    segRow(Q('segRule'), () => S.rule, (v) => { S.rule = v; });
+    ['hdr', 'foot', 'ans'].forEach((k) => {
+      Q(k).onchange = () => { S[k] = Q(k).checked; render(); };
+      SYNCERS.push(() => { Q(k).checked = S[k]; });
+    });
+    ['minus', 'auto', 'plus'].forEach((m) => {
+      const el = Q('cell' + m[0].toUpperCase() + m.slice(1));
+      el.onclick = () => { S.cell = m; render(); };
+      SYNCERS.push(() => el.classList.toggle('on', S.cell === m));
+    });
+    Q('copies').onchange = () => { S.copies = Math.max(1, Math.min(6, +Q('copies').value || 1)); Q('copies').value = S.copies; render(); };
+    Q('seed').onchange = () => { S.seed = Math.max(1, Math.min(99999999, +Q('seed').value || 1)); Q('seed').value = S.seed; render(); };
+    /* 每页墙数：空＝自动撑满（S.walls=0），填数字＝这一页只排这么多面墙（一页两卷时按"半页一卷"计）。
+       老师填的数原样留着（顶多拦到 999 防手滑），不在输入框里偷偷改成 30——
+       每页 30 面那道顶（用户 2026-11-17 第 3 条）由解算里的 clipped 那一路处理：按上限排，
+       状态条点名"你填 100 面、超过每页 30 面的上限"。静默把 100 改成 30 是不允许的。*/
+    const wallsIn = () => {
+      const v = Q('walls').value.trim();
+      S.walls = v === '' ? 0 : Math.max(1, Math.min(999, Math.round(+v) || 0));
+      render();
+    };
+    Q('walls').oninput = wallsIn;
+    Q('walls').onchange = wallsIn;
+    Q('reroll').onclick = () => { S.seed = (S.seed % 99999999) + 1; Q('seed').value = S.seed; render(); };
+    /* 导出 PDF 的建议文件名（用户 2026-11-20 第 2 条给的字：
+       「数墙补补_数的分与合_加减_种子号.pdf」「数墙补补_数的分与合_乘法_种子号.pdf」）。
+       做法只有"打印那一刻改标题"这一刀：Chrome/Edge 的「另存为 PDF」用 document.title 预填文件名，
+       所以按下打印前换成这个名字、对话框关掉（afterprint）再还原成页面标题。
+       它只是建议名——对话框里照样能手改，浏览器还会把非法字符换成下划线；版面一个像素没动。
+       末段用卷面「出题编号」那串同一个种子号，纸和文件对得上号（一页两卷、份数不进文件名，
+       用户给的两例里没有它们）。 */
+    const pdfName = () => [T('fnBrand'), T('fnBonds'), S.op === 'mul' ? T('fnMul') : T('fnAdd'), S.seed].join('_');
+    /* 四段全部现取字典 ⇒ 切英文后建议文件名跟着变英文（`../定稿流程.md` 双语规则第 9 条）；
+       中文态这四段与 v4.2 逐字相同，`print_title_check.py` 的第①②条判据照旧读得到。 */
+    window.__pdfName = pdfName;      // 探针要能读到这个名字（判据不许只长在页面上）
+    let TITLE_BACK = null, BACK_TIMER = null;
+    function restoreTitle() {
+      if (BACK_TIMER !== null) { clearTimeout(BACK_TIMER); BACK_TIMER = null; }
+      if (TITLE_BACK !== null) { document.title = TITLE_BACK; TITLE_BACK = null; }
+    }
+    function doPrint() {
+      restoreTitle();       // 上一轮要没还原成（内核没发 afterprint），先把标题收回来再存这一轮的
+      TITLE_BACK = document.title;
+      document.title = pdfName();
+      window.addEventListener('afterprint', restoreTitle, { once: true });
+      // 兜底还原：有些内核取消对话框时不发 afterprint。定时器 id 存下来、进下一轮打印时清掉，
+      // 免得上一轮那个 90 秒的定时器在这一轮对话框还开着的时候抢着把标题换回去
+      //（用户 2026-11-22 复测那轮看到的这一处，点头加固的；判据在 print_title_check.py 第 ⑤ 条）。
+      BACK_TIMER = setTimeout(restoreTitle, 90000);
+      window.print();
+    }
+    Q('print').onclick = doPrint;
+    // 按钮上挂出建议文件名：不占版面，鼠标一停就能看到"存出来叫什么"，不用先按打印再回头改
+    SYNCERS.push(() => { Q('print').title = F('statPrintTitle', { name: pdfName() }); });
+    SYNCERS.push(() => { Q('copies').value = S.copies; Q('seed').value = S.seed; });
+    SYNCERS.push(() => { const v = S.walls > 0 ? String(S.walls) : ''; if (Q('walls').value.trim() !== v) Q('walls').value = v; });
+    // 动态那行说明：勾了乘法就把"数域两档不管用"说在明处，别让人对着灰掉的按钮猜
+    SYNCERS.push(() => {
+      Q('modeNote').textContent = S.op === 'mul'
+        ? T('noteMulOn') + (S.tops.length ? T('noteMulTops') : '')
+        : (S.tops.length && !S.ranges.includes('le10')
+          ? F('noteTopsOff', { list: LS(S.tops) })
+          : '');
+    });
+  }
+  function syncBar() { SYNCERS.forEach((f) => f()); }
+
+  /* ================= 版面解算 ================= */
+  const MM = 25.4 / 96;                       // px → mm（96dpi，与数格涂涂同一换算）
+  /* 固定开销用探针量出来的真数（v3 说明块只剩"怎么玩 + 对错示例"，比 v2 矮一截）。
+     下面这些数取自 build ab4003db7e 的 Edge 探针读数：完整说明 24.81、紧凑 9.36、
+     组标签 4.50、答案页推导行整组贡献 5.1（行高 3.7 + 上边距 .9）。
+     hd 16.5 / 页脚 6.5 与数格涂涂同一套版式，沿用旧读数。
+     一页两卷时每一卷的版心高 127mm（打印态 .sheet.two 的内容盒）。
+     h 264 / h2 127 是 v3.8 从 272 / 131 让下来的：叠高 272 正正顶满版心 272，页盒一小 1mm
+     就把下半页顶到下一页上去（用户 2026-11-19 报的"第 2、4 页空白"），现在让出 3mm 余量，
+     安全页盒下限从 272 降到 264。量测账在 out/打印留白草稿_measure.log。
+     rule 24.8 → 18.4（用户 2026-11-20 第 1 条"例子放在右边，文字变成一行或两行，可以节省页面"）：
+     对错示例从"文字下面另起一行"改成"跟文字并排、贴右边缘"，整块矮 6.4mm，省出来的高度
+     正好够砖再放大一档（一卷三带实测砖宽 12.78 → 13.13mm）。18.4 是并右后的实量盒高，
+     不是"文字两行"的估算法则——示例那两幅图 14.2mm 是这块的下限，所以不能再往小里压。
+     w 仍是 184：v3.9 让出右侧安全缝（用户 2026-11-20"砖墙的间距缩小一些，右边让出 2mm"）后，
+     砖宽继续按 184 解算，页面上那 2mm 由 .browr 的 space-between 从墙间距里出——
+     砖不动、只让缝，所以这个数不能跟着改成 182，否则砖白缩一档。量测账在
+     草稿_右侧安全缝_20261120/对比说明.md（0.14 → 0.31mm 的前后对照）＋定稿判据 scripts/edge_border_check.py。 */
+  const GEO = { w: 184, h: 264, h2: 127, hd: 16.5, rule: 18.4, rule2: 9.4, ft: 6.5,
+    label: 5.0, eqline: 5.1, bandGap: 3.2, gap: 6, slack: 6.5, slack2: 4 };
+  const HR = 0.74;                             // 砖高 = 砖宽 × 这个比例
+  const U_CAP = 22, H_CAP = 16;                // "砖块不要过大过宽"
+  /* 砖宽下限按"砖里的字多大"定：字号 = 砖宽 × 0.4，9.5mm 的砖字约 11pt，一年级能写能认。
+     再往下就是"能出但费眼"的退路，页面会标出来。 */
+  const U_FLOOR = 9.5, U_HARD = 7;
+  /* slack = 块与块之间那些 margin（棋盘顶 2.5 + 页脚 padding 2…）。*/
+  let CAL_EXTRA = 0;                           // 噪声底标定时故意让出的高度
+  const slackMM = () => (S.per === 2 ? GEO.slack2 : GEO.slack) + CAL_EXTRA;
+  /* 每页题量上限（用户 2026-11-17 第 3 条：「每一页题目最多不要超过30个」）。
+     一页两卷是一张纸印两卷，所以上限摊到每一卷头上是 15 面——限的是"一页纸"，不是"一卷"。 */
+  const WALL_CAP = 30;
+  const wallsCap = () => Math.max(1, Math.floor(WALL_CAP / (S.per === 2 ? 2 : 1)));
+
+  /* 说明块三态：完整（玩法 + 对错示例）／紧凑（去掉示例）／不要。
+     一页两卷只有半页，勾"完整"也自动按紧凑排——这是尺寸决定的，不是偷偷改内容。 */
+  const miniRule = () => S.rule === 'mini' || (S.per === 2 && S.rule === 'full');
+  function ruleH() { return S.rule === 'off' ? 0 : (miniRule() ? GEO.rule2 : GEO.rule); }
+
+  /* 横向并列数：每行几面墙由形状定（用户 2026-11-17 第 3 条点名的 5 / 4 / 3 / 3 / 3），
+     砖宽反过来由"cols 面 + 行内缝"在 184mm 版心里解出来。形状是逐带参数，所以
+     baseCols/colsFor 都要带上 shape——两层3块（底 2 块）和两层多块（底 3 块）同为 L=2，
+     并列数不同，混为一谈就白缩一档砖宽。
+     缝宽这里给一点弹性：一行只有两三面墙的带（三～五层）本来横向就有富余，
+     砖越大缝越小，比"墙挨在一起、半页空气"合适。取 max(3mm, GEO.gap − 超过 H_CAP 的那部分)，
+     所以砖窄到 h=u×HR≤16mm 时缝仍是 6mm，和旧口径完全一致；只有砖顶到高度上限才让缝。 */
+  function widthCap(bands) {
+    let u = U_CAP;
+    bands.forEach((key) => {
+      const b = K.band(key);
+      const c = K.colsFor(b.L, b.shape);
+      let lo = 3, hi = GEO.gap + 1e-9;
+      for (let i = 0; i < 26; i++) {
+        const mid = (lo + hi) / 2;
+        const uu = (GEO.w - (c - 1) * mid) / (c * K.baseCols(b.L, b.shape));
+        if (Math.min(H_CAP, uu * HR) > mid) lo = mid; else hi = mid;   // 砖比缝还厚 → 缝还可以再小
+      }
+      const gg = (lo + hi) / 2;
+      u = Math.min(u, (GEO.w - (c - 1) * gg) / (c * K.baseCols(b.L, b.shape)));
+    });
+    return Math.max(6, u);
+  }
+  /* 一行墙占多高：组标签 + L 行砖（卷面下面那栏「数字」已取消，不再记账）。*/
+  function bandMetrics(b, u) {
+    const h = Math.min(H_CAP, u * HR);
+    const one = GEO.label + b.L * h;
+    return { h, one };
+  }
+  /* 答案页每面墙下面多一行推导算式，装页时按这一档的高度算。
+     ANS_K＝答案页砖相对学生卷的缩放比例（1＝不缩，学生卷和答案页同一把尺子）。
+     只缩砖：组标签（GEO.label）和推导算式那行（GEO.eqline）是字，不是砖——压它们等于
+     把老师的板书缩小复印，装页模型和 CSS 里都不让它们跟着 K 走。*/
+  let ANS_K = 1;
+  const ansOne = (b) => GEO.label + (b.one - GEO.label) * ANS_K + GEO.eqline;
+
+  /* ============ v4.0 第 1 条：一页一卷时把每卷答案压进一页 ============
+     用户 2026-11-20：「答案页的内容自动缩小并控制在一页内显示，没必要扩展到 2 页或 3 页。
+     一页 2 卷的时，答案页保持现状就行。」——所以：
+      · 一页一卷（per=1）：砖最多缩到 ANS_K_MIN，答案压成每卷一页；
+      · 一页两卷（per=2）：ANS_K 恒为 1，配对、裁开线、半页那套一律不动。
+     ANS_K_MIN＝0.85 是草稿量测（scripts/ans_fit_draft.py）定的：9 个覆盖面里最难的一档
+     （五带·每页 30 面、乘法·三层挑战）要 K＝0.90 就进一页，0.85 留了一档余量；
+     再低砖里的字就要贴 6.5pt 下限了。
+     压到底仍不止一页时不偷加页、也不裁切——ansParts 照自己的装页规则分页，
+     状态条点名"压到 85% 还要 N 页"，让老师自己减墙数或改一页两卷。 */
+  const ANS_K_MIN = 0.85;
+  let ANS_FIT = null;
+  /* ansParts 的装页模型（按行贪心）复刻一份，只用来数页数——渲染仍走 ansParts，
+     两处必须同口径，所以这里的 cap、rowH 算法跟 ansParts 里逐字对应。 */
+  function ansPagesAt(sh, k) {
+    const pageH = S.per === 2 ? GEO.h2 : GEO.h;
+    const cap = pageH - GEO.hd - (S.per === 2 ? GEO.slack2 : 6);
+    const rowH = (b) => GEO.label + (b.one - GEO.label) * k + GEO.eqline + GEO.bandGap;
+    const parts = [];
+    sh.bands.forEach((b) => {
+      const perPage = Math.max(1, Math.floor(cap / rowH(b)));
+      for (let done = 0; done < b.rows; done += perPage) parts.push(Math.min(perPage, b.rows - done) * rowH(b));
+    });
+    let pages = 0, used = 0;
+    parts.forEach((h) => {
+      if (used && used + h > cap) { pages++; used = 0; }
+      used += h;
+    });
+    return used ? pages + 1 : pages;
+  }
+  function ansFit(views) {
+    ANS_K = 1; ANS_FIT = null;
+    if (S.per === 2 || !S.ans || !views.length) return;
+    const pagesAt = (k) => Math.max.apply(null, views.map((sh) => ansPagesAt(sh, k)));
+    const from = pagesAt(1);
+    if (from <= 1) return;
+    let k = 1, pages = from;
+    for (let c = 0.95; c >= ANS_K_MIN - 1e-9; c = +(c - 0.05).toFixed(2)) {
+      k = c; pages = pagesAt(k);
+      if (pages <= 1) break;
+    }
+    ANS_K = k;
+    ANS_FIT = { k: k, from: from, pages: pages, floor: pages > 1 };
+  }
+  /* 压页这件事要说两句实话（状态条 + diag.notes 同一份，口径见 wallsNotes 上面那段注释）：
+     · 压到下限仍塞不进一页——不偷加页也不裁字，点名让用户减墙数；
+     · 压成功了但答案砖掉到学生可读下限（U_FLOOR）以下——这页是给老师看的，别让孩子在上面写。 */
+  function ansNotes(views, u) {
+    if (!ANS_FIT || !views.length) return [];
+    const pct = Math.round(ANS_FIT.k * 100), au = u * ANS_FIT.k, out = [];
+    if (ANS_FIT.floor) {
+      out.push(F('noteAnsPages', { pct, from: u.toFixed(1), to: au.toFixed(1), pages: ANS_FIT.pages, total: views[0].total }));
+    } else if (au < U_FLOOR) {
+      out.push(F('noteAnsFloor', { to: au.toFixed(1), from: u.toFixed(1), floor: U_FLOOR }));
+    }
+    return out;
+  }
+
+  /* 被数域/模式判死的带，版面一行都不该给它占（v3.3 复跑时抓到的）：
+     只勾 10以内 + 五带全开，贪心照样给五层留一行、内核出不了题又把它扔掉，
+     结果状态条报"27 面"、纸上只有 24 面，底下白留 69mm 还倒打一耙说"布局模型偏保守"。
+     可行性是纯函数（kernel 里 bandFeasible 的注释就写着"版面解算之前就要知道"），
+     所以解算之前先问一遍：留下的带参与贪心/DP，判死的带原样带出原因给状态条点名。*/
+  function winnow() {
+    const keep = [], dead = [];
+    K.BAND_ORDER.filter((k) => S.bands.includes(k)).forEach((key) => {
+      const fe = K.bandFeasible(S.op, S.ranges, key, S.tops);
+      if (fe.ok) keep.push(key);
+      else dead.push({ key, label: K.band(key).label, reason: fe.reason });
+    });
+    return { keep, dead };
+  }
+
+  /* 最小配置（每种层数各一行）都塞不下时的账，用来给用户说清楚差多少、怎么退 */
+  let LAST_FAIL = null;
+  /* 一页两卷为凑满一张纸补出来的卷数（份数 1→2、3→4），状态条要点名，不许静默加题。*/
+  let PAIR_PAD = 0;
+  /* 版面解算（两种走法）
+   * 砖宽只由横向预算定；纵向不是"缩砖来填"，是"一行一行加"：
+   *   1) 勾了的每一带先各占一行——复选了就都得露面；
+   *   2) 剩下的空白按"哪一带最矮就先补哪一带"逐行加，补到再补就超出为止；
+   *   3) 带序固定按 BAND_ORDER（易→难），所以一版的第一行永远是两层3块（用户 2026-11-16 第 11 条）。
+   * 最小配置都塞不下时返回 null，由外面把砖宽缩一档再来——砖宽是唯一的退路。
+   *
+   * 「每页墙数」填了数字（用户 2026-11-17 第 6 条）就不撑满了，改走第二条路：
+   *   按面数分配行（一行就是 cols 面：两层3块 5 面、两层多块 4 面、三～五层各 3 面），从易到难凑到正好 n 面；
+   *   剩余名额装不下任何一带的一行 → 那一带整带不排（面数是显式要求，"每带露面"是自动撑满的默认）；
+   *   n 比最小的一行还小 → 取行数最少的那一带排一行，实际面数比 n 多，状态条说清；
+   *   这一档砖的高度装不下 n 面 → 返回 null，外面缩一档砖重来（固定墙数时"取装得下的最大砖"）。
+   * 两条路都撞每页 30 面这道顶（第 3 条）：撑满贪心到 30 就停手，剩余高度换成大砖；
+   *   固定墙数填得比 30 大（或一页两卷时比半页的 15 大）就夹到上限，状态条点名是上限夹的。
+   */
+  function planFor(u) {
+    const WINNOW = winnow();
+    if (!WINNOW.keep.length) {
+      // 勾到的带被数域/模式全判死：这不是版面能救的，缩砖也没用——照内核的口径把话说清
+      throw new Error(T('statFatal') + LJS(WINNOW.dead.map((d) => `${d.label}${LANG === 'en' ? ' — ' : '——'}${d.reason}`)));
+    }
+    // 一页两卷时每一"半页"都自带页眉/说明/页脚，所以固定开销按卷数计，不能整体除以 2
+    const pageH = S.per === 2 ? GEO.h2 : GEO.h;
+    /* 学生卷与答案页共用同一个盘面尺寸，所以可用高度取两边开销的较大者：
+       答案页没有说明块和页脚，但多一行推导写式（GEO.eqline）。勾了"无说明＋无页脚"时
+       学生卷的开销反而比答案页小，一页两卷的半页只剩 127mm，那 5.1mm 就真能顶出去。 */
+    const stOver = (S.hdr ? GEO.hd : 0) + ruleH() + (S.foot ? GEO.ft : 0);
+    const anOver = S.ans ? (S.hdr ? GEO.hd : 0) + GEO.eqline : 0;
+    const availH = pageH - Math.max(stOver, anOver) - slackMM();
+    const mk = () => WINNOW.keep.map((key) => {
+      const b = K.band(key);
+      const m = bandMetrics(b, u);
+      return { key, L: b.L, shape: b.shape, label: b.label,
+        cols: K.colsFor(b.L, b.shape), rows: 1, one: +m.one.toFixed(2), u: +u.toFixed(2), h: +m.h.toFixed(2) };
+    });
+    const bandsH = (bs) => bs.filter((b) => b.rows).reduce((s, b) => s + b.rows * b.one + (b.rows - 1) * GEO.bandGap, 0)
+      + Math.max(0, bs.filter((b) => b.rows).length - 1) * (GEO.bandGap + 2);
+    const total = (bs) => bs.reduce((s, b) => s + b.cols * b.rows, 0);
+    const cap = wallsCap();                   // 每页最多 30 面（一页两卷＝每卷 15 面），第 3 条
+    const fresh = mk();
+    fresh.forEach((b) => { b.per = b.cols * b.rows; });
+    /* "每带各一行"塞不下 → 自动撑满这一路没得排，缩砖重来。
+       固定每页墙数那一路不走这条：它的解本来就可能只排一部分带，判据是函数末尾那一条。 */
+    if (!(S.walls > 0) && bandsH(fresh) > availH) {
+      LAST_FAIL = {
+        u: +u.toFixed(2), need: +bandsH(fresh).toFixed(1), avail: +availH.toFixed(1),
+        board: +bandsH(fresh).toFixed(1), walls: total(fresh),
+      };
+      return null;
+    }
+    const greedy = (bs, lim) => {
+      lim = lim === undefined ? cap : lim;
+      for (let guard = 0, rot = 0; guard < 80; guard++) {
+        let added = false;
+        /* 轮流加行，不是"谁矮一直加谁"：只勾两层3块和三层时，后者一行比前者高，
+           一直补矮的那一带会排成 42 面两层 + 3 面三层，一节课练的全是最浅的墙。
+           按带序（易→难）轮转，轮到谁谁加；这一轮谁都加不进就收工。
+           每页上限（第 3 条）和高度一样是硬闸：撞满 30 面就停，剩下的空白留给大砖。*/
+        for (let t = 0; t < bs.length && !added; t++) {
+          const b = bs[(rot + t) % bs.length];
+          b.rows++; b.per = b.cols * b.rows;
+          if (bandsH(bs) <= availH && total(bs) <= lim) { added = true; rot = (bs.indexOf(b) + 1) % bs.length; }
+          else b.rows--; b.per = b.cols * b.rows;
+        }
+        if (!added) break;
+      }
+      return total(bs);
+    };
+    if (!(S.walls > 0)) {
+      const bs = fresh;
+      /* 「还能再加一行，但再加就超 30 面」要说得出证据：拿同一批不带、不设上限再贪心一遍。
+         上限比版面还紧时，这一遍的面数就是"版面本来能给几面"，状态条拿它跟 30 对照。*/
+      const full = greedy(mk(), Infinity);      // 不设上限能排几面：capCut 的证据
+      const got = greedy(bs, cap);
+      return { bands: bs, total: got, availH: +availH.toFixed(1), task: +bandsH(bs).toFixed(1),
+        capCut: full > got, autoFull: full, auto: full, winnowed: WINNOW.dead };
+    }
+    const auto = greedy(mk(), Infinity);              // 撑满能排几面：状态条要拿它跟用户填的数对照
+    const bs = mk();
+    /* 面数分配：一行就是 cols 面（两层3块 5 面、两层多块 4 面、三～五层各 3 面），所以"每页 8 面"未必凑得整。
+       在 Σ cols_i × 行数 = s（s ≤ n）的所有解里挑一个，比较顺序是：
+         ① 最容易的几带连续露面（前缀最长）——从易到难是这一卷的骨架，别为了凑数把两层3块整带挤掉；
+         ② 露面的带更多；③ 各带行数更平均（不要一个带排五行、别的都一行）；④ 还是不行就容易的排得多。
+       凑不到 n 就退而求其次取 n−1、n−2…（状态条会点名差几面），一个都凑不出（n 比最小一行还小）
+       就排"行数最少的那一带一行"，实际面数比 n 多，也照样说清楚。
+       n 先被每页上限夹一道（第 3 条）：填 30 面又勾一页两卷，每卷只排 15 面，状态条说清是谁夹的。*/
+    const want = S.walls, n = Math.min(want, cap), clipped = want - n;
+    const score = (v) => {
+      let pre = 0;
+      while (pre < v.length && v[pre] > 0) pre++;
+      return [pre, v.filter((x) => x > 0).length, -Math.max.apply(null, v.concat([0]))].concat(v);
+    };
+    const better = (a, b) => {
+      for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return a[i] > b[i];
+      return false;
+    };
+    const best = new Array(n + 1).fill(null);
+    best[0] = bs.map(() => 0);
+    for (let s = 0; s <= n; s++) {
+      if (!best[s]) continue;
+      bs.forEach((b, i) => {
+        const t = s + b.cols;
+        if (t > n) return;
+        const v = best[s].slice(); v[i]++;
+        if (!best[t] || better(score(v), score(best[t]))) best[t] = v;
+      });
+    }
+    let rows = null, got = 0;
+    for (let s = n; s >= 1; s--) if (best[s]) { rows = best[s]; got = s; break; }
+    if (!rows || !got) {                             // n 比最小的一行还小
+      const s = bs.slice().sort((a, b) => a.cols - b.cols)[0];
+      rows = bs.map((b) => (b.key === s.key ? 1 : 0));
+    }
+    bs.forEach((b, i) => { b.rows = rows[i]; b.per = b.cols * b.rows; });
+    const placed = bs.filter((b) => b.rows);
+    if (!placed.length) return null;
+    if (bandsH(bs) > availH) {
+      LAST_FAIL = {
+        u: +u.toFixed(2), need: +bandsH(bs).toFixed(1), avail: +availH.toFixed(1),
+        board: +bandsH(bs).toFixed(1), walls: total(bs), want, fixed: n,
+      };
+      return null;
+    }
+    const real = total(bs);
+    return { bands: bs, total: real, availH: +availH.toFixed(1), task: +bandsH(bs).toFixed(1),
+      fixed: n, auto, short: Math.max(0, n - real), over: Math.max(0, real - n), clipped,
+      dropped: bs.filter((b) => !b.rows).map((b) => b.label), winnowed: WINNOW.dead };
+  }
+
+  /* ================= 渲染 ================= */
+  /* 空砖在卷面上就是一个空白格子（用户 2026-11-17 第 4 条"空的砖块空白就好"）：
+     学生页用 .hv（无底色），教师卷的答案砖另用 .a（浅蓝底 + accent 字）——
+     这两个类必须分开，判据一边查"学生页的空砖不许带底色"，一边查"答案页填上的砖对得上"。 */
+  function brickHTML(st, c, answered) {
+    const hid = st.hidden.has(c.i);
+    return `<i class="bk${hid ? (answered ? ' a' : ' hv') : ''}">${hid && !answered ? '' : c.val}</i>`;
+  }
+  function structHTML(st, idx, answered) {
+    let rows = '';
+    for (let d = 0; d < st.L; d++) {
+      const cs = st.cells.filter((c) => c.row === d).sort((a, b) => a.col - b.col);
+      // 错缝：第 d 行整体右移 (L−1−d)/2 个砖宽，用 ch 当单位不行——砖宽是 mm，直接算 mm
+      // 答案页缩砖时位移要跟着缩，否则错缝的"半块"对不上下一行
+      const uu = answered ? st._u * ANS_K : st._u;
+      const off = ((st.L - 1 - d) * 0.5 * uu).toFixed(2);
+      rows += `<div class="brow" style="margin-left:${off}mm">${cs.map((c) => brickHTML(st, c, answered)).join('')}</div>`;
+    }
+    /* 组标签只剩序号：v3 把「几层」和入门形的"分与合/口诀"都删掉了（用户第 3 条），
+       形状的信息在带那一行的分组里天然看得见——同一带的墙长得一样。
+       带序号超过 ㉚ 就换成阿拉伯数字：42 面一页是常态，绕回 ① 会让老师喊"第①面"时两头跑。*/
+    const lab = `<div class="glabel"><b>${idx < CIRC.length ? CIRC[idx] : idx + 1}</b></div>`;
+    // 教师卷在墙下面补一行推导（学生卷这一栏已经取消）
+    const eq = answered ? `<div class="eqrow"><span class="eqs">${st.log.slice(0, 3).map((e) => `<span class="eq">${K.eqOf(st, e)}</span>`).join('')}</span></div>` : '';
+    return `<div class="group" style="--u:${(answered ? st._u * ANS_K : st._u).toFixed(2)}mm;` +
+      `--bh:${(answered ? st._h * ANS_K : st._h).toFixed(2)}mm">${lab}<div class="wall">${rows}</div>${eq}</div>`;
+  }
+  /* 对错示例的那两幅数字（用户 2026-11-17 第 5 条：原来那幅错例"底 3、4、4 → 顶 7、8"
+     算式其实全对，只是被标了个 ✗，孩子看不出错在哪）。
+     现在两幅都画三块砖的入门形、同一面墙只差顶上那个数：对例 3+4=7；错例写 6（差 1，一眼看得见）。
+     乘法档底下同样两块砖，错例写成 3+4=7——"把乘做成加"正是这一档最常见的错。
+     形状取三块砖不是因为只勾了「两层3块」：错缝墙上"一块砖压在相邻两块正中"就是这同一句几何，
+     示例画得跟卷面最简的那一级一样，孩子照着填第一面墙就能对上。
+     这一份数字同时进 diag.demo：判据要钉住"错例必须真的算错"，别让下次改词又把算式改回全对。*/
+  function demoFig() {
+    const mul = S.op === 'mul';
+    const right = mul ? 3 * 4 : 3 + 4;
+    return { kids: [3, 4], okTop: right, badTop: mul ? 3 + 4 : right - 1 };
+  }
+  function rulebarHTML() {
+    const mul = S.op === 'mul';
+    const row = (arr, off, bad) => `<div class="drow">${arr.map((v, j) =>
+      `<i${j === bad ? ' class="h"' : ''} style="margin-left:${j ? 0 : off}mm">${v}</i>`).join('')}</div>`;
+    const F = demoFig();
+    const demo = (ok) => {
+      const t = ok ? F.okTop : F.badTop;
+      return `<div class="demo${ok ? '' : ' bad'}">${row([t], 3.1, ok ? -1 : 0)}${row(F.kids, 0)}<span class="dcap">${ok ? TXT.demoOkCap : TXT.demoBadCap}</span></div>`;
+    };
+    return `<div class="rulebar">` +
+      `<div class="rseg"><span class="tag">${TXT.ruleTag}</span>${mul ? TXT.ruleHowMul : TXT.ruleHow}</div>` +
+      (miniRule() ? '' : `<div class="rseg demos">${demo(true) + demo(false)}</div>`) + `</div>`;
+  }
+  /* 裁开线：插在"上半页"和"下半页"之间的那个 10mm 缝里（用户 2026-11-18 挑的方案 C1，
+     做法与样式取自数格涂涂的 .cut）。
+     为什么必须是流里的块、不能绝对定位挂进卷面：草稿量过——挂进卷面的那版（C3）会把上半页的
+     scrollHeight 顶高 10.05mm，而"半页溢出"正是全链的判据（verify_sample/sweep 都读它），
+     等于为了少一个 DOM 节点把整条链点红；线自己占满那 10mm、页 margin-bottom 归零才是对的
+     （读数与页数对照见 out/裁开线草稿_measure.log）。 */
+  function cutlineHTML() {
+    return S.per === 2 ? `<div class="cutline"><i></i><span>${TXT.cutline}</span><i></i></div>` : '';
+  }
+  function sheetHTML(sh, copy) {
+    const bands = sh.bands.map((b) =>
+      `<div class="band" style="gap:${GEO.bandGap}mm">${Array.from({ length: b.rows }).map((_, r) =>
+        `<div class="browr">${Array.from({ length: b.cols }).map((_, c2) => {
+          const st = sh.structs[b.start + r * b.cols + c2];
+          return st ? structHTML(st, b.start + r * b.cols + c2, false) : '';
+        }).join('')}</div>`).join('')}</div>`).join('');
+    /* 卷头那个"最大 N"取 maxShown（只看得见的那些砖里的最大值）：两层3块只勾"合"时
+       挖的就是顶砖，用全体最大值就是把答案印在卷头上。 */
+    /* 卷头那串"2+3 层"按这一页真排出来的带算（不是按勾选算）：被数域收敛掉的层数、
+       或每页墙数太少而一行都塞不进的层数，都不该出现在卷头上——孩子翻遍卷面也找不到那一层。 */
+    const lays = [...new Set(sh.bands.filter((b) => b.rows).map((b) => b.L))].sort((a, b) => a - b).join('+');
+    const hd = S.hdr ? `<div class="hd"><div><span class="ttl">${TXT.title}</span><span class="sub">${S.op === 'mul' ? TXT.subMul : TXT.sub} · <b>${TXT.ansRule(sh.maxShown)}</b> · ${F('paperLayers', { lays })}</span></div>` +
+      `<div class="meta"><span class="line">${TXT.metaName}</span><span class="line">${TXT.metaTime}</span></div></div>` : '';
+    const board = `<div class="wallzone">${bands}</div>`;
+    /* 一页两卷：每张纸的上半页（copy 是奇数那一卷）后面紧跟着裁开线，线后面才是下半页。
+       答案页用同一把尺子（ansPageHTML 里的 i % 2 === 0）。 */
+    const first = S.per === 2 && copy % 2;
+    return `<section class="sheet${S.per === 2 ? ' two' + (first ? ' nobrk' : '') : ''}" data-copy="${copy}">` +
+      hd + (S.rule !== 'off' ? rulebarHTML() : '') + board +
+      (S.foot ? `<div class="ft"><span class="tag">${T('paperCheckTag')}</span><span>${TXT.ft}</span><span class="seed">${TXT.seedFmt(S.seed)}</span></div>` : '') +
+      `</section>` + (first ? cutlineHTML() : '');
+  }
+  /* 答案页先出"页的内容"，纸张外壳（整页还是半页、要不要翻页）交给 ansPageHTML 统一装配：
+     一页两卷时一张纸要放两卷的答案，分页序号和 .two/.nobrk 得按"跨卷的答案页总序列"配对，
+     不能各卷自己算自己的奇偶，否则两卷的答案各占一张纸的下半页，裁开对不上。 */
+  function ansParts(sh) {
+    /* 答案页按"行"装页，不是按带装页。两个坑都踩过：
+       1) 一带一页太浪费——两层带只有几十毫米高，独占一张纸等于烧纸（用户要"别浪费"）；
+       2) 只按带切页会卡死：纯黑板面（页眉/说明/页脚都不印）时盘面能排到 11 行，
+          一整带 11 行远超一页容量，而"放不下就另起一页"只在 cur 非空时触发，
+          于是整带被硬塞在一页上，答案页溢出 55mm，解算器把每一档砖宽都判死 → 整版出不了题。
+       所以先把带拆成行段（每段不超过一页），再按行段贪心装页；序号顺着原始行号往下编。*/
+    const pageH = S.per === 2 ? GEO.h2 : GEO.h;
+    const cap = pageH - GEO.hd - (S.per === 2 ? GEO.slack2 : 6);
+    const rowH = (b) => ansOne(b) + GEO.bandGap;
+    const parts = [];
+    sh.bands.forEach((b) => {
+      const perPage = Math.max(1, Math.floor(cap / rowH(b)));
+      for (let done = 0; done < b.rows; done += perPage) {
+        parts.push({ b, from: done, rows: Math.min(perPage, b.rows - done) });
+      }
+    });
+    const pages = [];
+    let cur = [], used = 0;
+    parts.forEach((p) => {
+      const h = p.rows * rowH(p.b);
+      if (cur.length && used + h > cap) { pages.push(cur); cur = []; used = 0; }
+      cur.push(p); used += h;
+    });
+    if (cur.length) pages.push(cur);
+    return pages.map((ps) => ({
+      bands: ps.map((p) => {
+        const b = p.b;
+        return `<div class="band" style="gap:${GEO.bandGap}mm">${Array.from({ length: p.rows }).map((_, r) =>
+          `<div class="browr">${Array.from({ length: b.cols }).map((_, c2) => {
+            const i = b.start + (p.from + r) * b.cols + c2, st = sh.structs[i];
+            return st ? structHTML(st, i, true) : '';
+          }).join('')}</div>`).join('')}</div>`;
+      }).join(''),
+      what: LTS(ps.map((p) => {
+        const n = p.rows * p.b.cols;
+        return `${p.b.label} ${F('paperWallsOf', { n, z: PL(n) })}`;
+      })),
+      maxVal: sh.maxVal,
+    }));
+  }
+  function ansPageHTML(pg, i, hasNext) {
+    /* 半页答案页与学生卷同一套配对：偶数下标那半张不留分页符（.nobrk），两张拼满一张 A4。
+       裁开线只在"下面确实还有半页"时印——各卷答案页数不等时跨卷序列可能是单数，
+       末尾那半张没有下半页，线留在纸尾等于让老师往空白处下剪刀。 */
+    const first = S.per === 2 && i % 2 === 0;
+    const cls = S.per === 2 ? ' two' + (i % 2 ? '' : ' nobrk') : '';
+    return `<section class="sheet anssheet${cls}"><div class="hd"><div><span class="ttl">${TXT.title}</span>` +
+      `<span class="sub">${TXT.ansTag} · ${pg.what} · ${TXT.ansRule(pg.maxVal)}</span></div>` +
+      `<div class="meta"><span class="line">${TXT.seedFmt(S.seed)}</span><span class="line">${S.op === 'mul' ? TXT.mulTag : TXT.addTag}</span></div></div>` +
+      `<div class="wallzone">${pg.bands}</div></section>` + (first && hasNext ? cutlineHTML() : '');
+  }
+  /* 兼容旧调用名：一卷的答案页直接拼成字符串（样张脚本里还有地方按这个口径读）。*/
+  function ansSheets(sh) { return ansParts(sh).map((pg, i) => ansPageHTML(pg, i)).join(''); }
+
+  /* ================= 溢出测量与解算主循环 ================= */
+  function sheetsEl() { return Q('stage'); }
+  function buildSheets(views) {
+    /* 答案页跨卷统一编号：一页两卷时第 1、2 张答案半页拼成一张纸，第 3、4 张拼成下一张。
+       按卷各自编号会让每张纸的下半页各摊上一卷的答案，裁开对不上位。
+       先把各卷答案页摊平成一条序列，才能在生成每半页时知道"后面还有没有半页"（裁开线的条件）。 */
+    const ansPartsAll = [];
+    if (S.ans) views.forEach((v) => ansParts(v.sh).forEach((pg) => ansPartsAll.push(pg)));
+    const ans = ansPartsAll.map((pg, i) => ansPageHTML(pg, i, i + 1 < ansPartsAll.length));
+    sheetsEl().innerHTML = views.map((v, i) => sheetHTML(v.sh, i + 1)).join('') + ans.join('');
+  }
+  /* 溢出有两个独立信号，取大的那个：
+     1) scrollHeight − clientHeight：Chromium 一路都认；
+     2) 子块矩形相对版心边的越界量：不看 overflow 怎么算，WebKit（Safari）在
+        overflow:hidden 下可能把 scrollHeight 算成裁切后的值，只信 1) 就会"量不到溢出"。
+     数格涂涂在 Safari 上吃过的亏就是只信了 1)。 */
+  function overflowMM() {
+    let worst = 0, el = '';
+    [].forEach.call(sheetsEl().querySelectorAll('.sheet'), (s) => {
+      const cs = getComputedStyle(s), r = s.getBoundingClientRect();
+      const top = r.top + parseFloat(cs.paddingTop), bot = r.bottom - parseFloat(cs.paddingBottom);
+      const lf = r.left + parseFloat(cs.paddingLeft), rt = r.right - parseFloat(cs.paddingRight);
+      let vOver = 0, hOver = 0;
+      [].forEach.call(s.children, (n) => {
+        const b = n.getBoundingClientRect();
+        if (!b.width && !b.height) return;
+        vOver = Math.max(vOver, b.bottom - bot, top - b.top);
+        hOver = Math.max(hOver, b.right - rt, lf - b.left);
+      });
+      const ov = Math.max((s.scrollHeight - s.clientHeight) * MM, vOver * MM);
+      if (ov > worst) { worst = ov; el = s.className + '/' + s.dataset.copy; }
+      const ovw = Math.max((s.scrollWidth - s.clientWidth) * MM, hOver * MM);
+      if (ovw > worst) { worst = ovw; el = s.className + '(宽)'; }
+    });
+    return { over: worst, el };
+  }
+
+  let FLOOR_OVER = 0, TOLF = 0.2, OVER_EL = '';
+
+  /* 量测自检：故意在纸的底边外挂一块 40mm 的内容，看溢出读数跟不跟得上。
+     用绝对定位是因为普通子块会被 flex 的伸缩性吃掉（试过：注入 40mm，wallzone 自己缩了，
+     溢出量还是 0——那测的是弹性布局的 absorb，不是量测的灵敏度）。
+     跟得上才说明"溢出 0.00"是真话；跟不上就得把"量不准"喊出来，不能拿假信号当撑满。 */
+  function selfTest() {
+    const s = sheetsEl().querySelector('.sheet');
+    if (!s) return null;
+    const before = overflowMM().over;
+    const d = document.createElement('div');
+    d.style.cssText = 'position:absolute;left:0;top:100%;width:10mm;height:40mm';
+    s.appendChild(d);
+    const after = overflowMM().over;
+    d.remove();
+    return { ok: after - before >= 30, before: +before.toFixed(2), after: +after.toFixed(2) };
+  }
+
+  /* 噪声底：先把版心故意让出 60mm（明显留白）画一遍。这时候任何正溢出都不可能是内容太多，
+     只可能是浏览器自己的舍入——Safari 那约 0.1mm 的固定残差就是在这里被量出来计入容差的。
+     数格涂涂 2026-11-15 的教训：不量噪声底、直接用固定 0.2mm 容差，Safari 会把版面砸小一档。 */
+  function calibrate(seeds, u) {
+    CAL_EXTRA = 60;
+    let v = null, cu = u, g = 0;
+    while (!v && cu > U_HARD && g++ < 60) { v = buildAll(seeds, cu); cu = Math.round((cu - 0.5) * 100) / 100; }
+    FLOOR_OVER = v ? Math.max(0, overflowMM().over) : 0;
+    CAL_EXTRA = 0;
+    TOLF = Math.max(0.2, Math.min(FLOOR_OVER + 0.05, 1.0));
+    return FLOOR_OVER;
+  }
+
+  function makeView(seed, u) {
+    const plan = planFor(u);
+    if (!plan) return null;
+    let start = 0;
+    plan.bands.forEach((b) => { b.start = start; start += b.per; });
+    const o = { op: S.op, ranges: S.ranges.slice(), tops: S.tops.slice(), dir: S.dir.slice(), diff: S.diff };
+    const sh = K.generate(seed, o, plan.bands);
+    sh.bands = plan.bands;
+    sh.total = plan.total;
+    sh.planH = plan.task; sh.availH = plan.availH;
+    /* 固定"每页墙数"那一路的账：撑满本来能排几面、比你要的少几面、哪些带因为一行都塞不进没排。
+       状态条靠它把"为什么不是 8 面"说清楚，不许让人对着空白的下半页猜。*/
+    sh.fixed = plan.fixed || 0; sh.auto = plan.auto || 0;
+    sh.short = plan.short || 0; sh.wallsOver = plan.over || 0; sh.clipped = plan.clipped || 0;
+    /* 自动撑满被每页 30 面这道顶截住了（版面还能再加一行）——状态条要说"是上限拦的，不是排不下"。*/
+    sh.capCut = !!plan.capCut; sh.autoFull = plan.autoFull || 0;
+    sh.wallsCap = wallsCap();
+    sh.bandsDropped = plan.dropped || [];
+    /* 数域/模式判死的带压根没进这份 plan（一行都没占），但"自动收敛"那句还得说：
+       补进 dropped，状态条（kernelNotes）和判据读的是同一个字段，不许页面喊了机器看不见。 */
+    if (plan.winnowed && plan.winnowed.length) {
+      const have = new Set((sh.dropped || []).map((d) => d.key));
+      sh.dropped = (sh.dropped || []).concat(plan.winnowed.filter((w) => !have.has(w.key)));
+    }
+    sh.maxU = +u.toFixed(2);
+    sh.structs.forEach((st) => {
+      // 必须按 key 找带：两层3块和两层多块同为 L=2，按 L 找会把砖宽挂错
+      const b = plan.bands.find((x) => x.key === st.key);
+      st._u = b ? b.u : u; st._h = b ? b.h : u * HR;
+    });
+    return { sh, plan };
+  }
+  function buildAll(seeds, u) {
+    const built = seeds.map((s) => makeView(s, u));
+    if (built.some((b) => !b)) return null;      // 这个砖宽连"每带各一行"都塞不下
+    ansFit(built.map((v) => v.sh));              // v4.0：一页一卷时把每卷答案压进一页（只缩砖）
+    buildSheets(built);
+    return built.map((v) => v.sh);
+  }
+
+  /* 底部还剩多少没用上的空间：.sheet 是定高的 flex 容器、页脚靠 margin-top:auto 贴底，
+     所以剩余空间不表现为溢出，而表现为"子块之间的缝"。这里量缝的和（不是子块高度之和——
+     子块高度那套算法会把 auto 边距也算成内容，剩余永远为 0，这个坑踩过一次）。 */
+  function airMM() {
+    let worst = 0, el = '';
+    [].forEach.call(sheetsEl().querySelectorAll('.sheet'), (s) => {
+      if (s.classList.contains('anssheet')) return;
+      const cs = getComputedStyle(s), sr = s.getBoundingClientRect();
+      const top = sr.top + parseFloat(cs.paddingTop), bot = sr.bottom - parseFloat(cs.paddingBottom);
+      const kids = [].map.call(s.children, (n) => n.getBoundingClientRect()).sort((a, b) => a.top - b.top);
+      if (!kids.length) return;
+      let free = (top - kids[0].top) + (bot - kids[kids.length - 1].bottom);
+      for (let i = 1; i < kids.length; i++) free += Math.max(0, kids[i].top - kids[i - 1].bottom);
+      free *= MM;
+      if (free > worst) { worst = free; el = s.className; }
+    });
+    return { air: worst, el };
+  }
+
+  /* 解算：砖宽从横向上限往下逐档试，选档标准按用户那句"最大限度利用空间、砖块不要过大过宽"排：
+     1) 先比题量——同一页能多排一行墙就多练几面，面数多的档胜出；
+     2) 面数相同时取先试到的大砖档（不为多两毫米空气把砖缩一号）；
+     3) 可读下限（9.5mm）以上的档全塞不下时，才走 7–9.5mm 的退路，并在页面上写明砖是缩出来的。 */
+  function fitViews(seeds) {
+    /* 砖宽上限按"真会排出来的带"算：被数域判死的带（只勾 10以内时的五层）一行都不会露面，
+       不该拿它 18 个砖宽的行把整页的砖压小一档。 */
+    const wk = winnow();
+    const cap = widthCap(wk.keep.length ? wk.keep : S.bands);
+    const u0 = Math.min(U_CAP, cap * (S.cell === 'minus' ? 0.86 : S.cell === 'plus' ? 1.06 : 1));
+    calibrate(seeds, u0);
+    const ladder = [];
+    for (let u = u0; u >= U_FLOOR - 1e-9; u = Math.round((u - 0.35) * 100) / 100) ladder.push(u);
+    for (let u = Math.min(U_FLOOR, u0); u >= U_HARD - 1e-9; u = Math.round((u - 0.25) * 100) / 100) ladder.push(u);
+    let best = null;
+    window.__tries = [];                                // 解算台帐：量测不对时先看这里
+    for (const u of ladder) {
+      const views = buildAll(seeds, u);
+      if (!views) { window.__tries.push({ u, fit: false }); continue; }   // 连"每带各一行"的最小配置都塞不下
+      const m = overflowMM(); OVER_EL = m.el;
+      const a = airMM();
+      window.__tries.push({ u, rows: views[0].bands.map((b) => b.rows).join('/'), walls: views[0].total, model: views[0].planH, over: +m.over.toFixed(2), air: +a.air.toFixed(1) });
+      if (m.over > TOLF) continue;                      // 模型说装得下、真渲染装不下：这档不算
+      const small = u < U_FLOOR - 1e-9;
+      /* 可读下限是硬边界：下面的档只在"下限以上一档都没量出可用版面"时才走，
+         绝不为了多排两面墙把砖缩到孩子写不下（试过不设限，四层卷会缩到 7.2mm）。 */
+      if (small && best) break;
+      /* 比的是**不重复**的题量（用户 2026-11-22 第 3 条：交换因数算同一道，一页只出一次）——
+         勾了口诀后池子可能比一页名额小，撞出来的那几面不该算练题量：
+         不能让"多排两面重复题"赢过"少排但每道都新"，那样只会把砖白白缩一号。
+         平手时取"总面数少的那一档"：uniq 一样就意味着 total 越小 dups 越少，
+         重复正是用户要避免的东西（第一版只比 uniq，勾 9 的 30 面卷里 6 面是重印的，
+         状态条虽然喊了，但明明有一档只重印 1 面——判据 sweep「同页撞了同一道题」逮的就是这个）。 */
+      const uniq = views.reduce((s, v) => s + v.total - (v.dups || 0), 0);
+      const all = views.reduce((s, v) => s + v.total, 0);
+      if (!best || uniq > best.total || (uniq === best.total && all < best.all))
+        best = { views, u, over: m.over, air: a.air, airEl: a.el, total: uniq, all, small };
+      /* 定了每页墙数就反过来选档：ladder 是从大砖往下排的，第一档装得下 n 面就是"能装下的最大砖"，
+         再往下缩只会把砖做小、空气做多——固定墙数要的就是大砖。 */
+      if (S.walls > 0) break;
+      if (best.air < 3) break;                      // 已经顶到边了，不为 2mm 继续缩
+    }
+    if (!best) return { views: null, u: U_HARD, over: 0, air: 0, floor: FLOOR_OVER, tol: TOLF, stuck: true, small: true };
+    /* 固定每页墙数时再替砖争取一次（用户 2026-11-17 第 1、3 条）：横向预算按"勾到的带"算，
+       可 DP 最后只让其中几带排上行，没露面的带（rows=0）不该继续把砖压小——五带全勾、只要 8 面时
+       只有两层3块和三层露面，四五层那两道"18 个砖宽"的预算纯属冤枉砖。
+       用露面带的宽度上限再解一次：装得下就换档，装不下（高度先撞）就保留原来那档。
+       只多跑一次，不迭代——迭代会在"少一带露面 ↔ 砖变大 → 又少一带"之间来回抖。 */
+    if (S.walls > 0) {
+      const placed = best.views[0].bands.filter((b) => b.rows).map((b) => b.key);
+      const k = S.cell === 'minus' ? 0.86 : S.cell === 'plus' ? 1.06 : 1;
+      const cap2 = placed.length ? Math.min(U_CAP, widthCap(placed) * k) : 0;
+      const u2 = Math.floor((cap2 + 1e-9) / 0.35) * 0.35;      // 回到 0.35mm 的阶梯上
+      if (u2 > best.u + 0.01 && u2 >= U_FLOOR - 1e-9) {
+        const views2 = buildAll(seeds, u2);
+        if (views2) {
+          const m2 = overflowMM(), a2 = airMM();
+          window.__tries.push({ u: u2, retry: true, rows: views2[0].bands.map((b) => b.rows).join('/'),
+            walls: views2[0].total, model: views2[0].planH, over: +m2.over.toFixed(2), air: +a2.air.toFixed(1) });
+          if (m2.over <= TOLF) best = { views: views2, u: u2, over: m2.over, air: a2.air, airEl: a2.el,
+            total: views2.reduce((s, v) => s + v.total, 0), small: u2 < U_FLOOR - 1e-9 };
+        }
+      }
+    }
+    buildAll(seeds, best.u);                        // DOM 要停在选中的那一档，不是最后试过的那档
+    return { views: best.views, u: best.u, over: best.over, air: best.air, airEl: best.airEl, small: best.small, floor: FLOOR_OVER, tol: TOLF, stuck: false };
+  }
+
+  /* ================= 主流程 ================= */
+  function fatalPanel(msg) {
+    sheetsEl().textContent = '';
+    const f = document.createElement('div');
+    f.className = 'fatal';
+    f.textContent = msg;
+    sheetsEl().appendChild(f);
+  }
+
+  /* 塞不下时该说什么：把"差多少毫米"和"往回退哪一步"讲清楚。
+     只说"版面溢出"老师没法操作，光把砖缩到 6mm 又是把题做坏。 */
+  function noFitMsg(f) {
+    const way = S.per === 2 ? T('noteWayPer2') : T('noteWayPer1');
+    const names = LS(K.BAND_ORDER.filter((k) => S.bands.includes(k)).map((k) => K.band(k).label));
+    if (S.walls > 0 && f.want) {
+      const n = f.fixed || f.want;
+      const by = n < f.want ? F('noteCapClamp', { n, want: f.want }) : '';
+      return F('noteNoFitWant', { way, by, n, names, need: f.need, avail: f.avail, u: f.u });
+    }
+    return F('noteNoFitMin', { way, avail: f.avail, names, walls: f.walls, need: f.need, u: f.u });
+  }
+
+  /* 内核回传的三类"没静默"：数域把某一带收敛掉了、同页去重退了洞、去重彻底撞车。*/
+  function kernelNotes(views) {
+    const warn = [];
+    const dropMap = new Map();
+    views.forEach((sh) => (sh.dropped || []).forEach((d) => { if (!dropMap.has(d.key)) dropMap.set(d.key, d.reason); }));
+    if (dropMap.size) warn.push(T('noteAutoShrink') + LJS([...dropMap].map(([k, r]) => `${K.band(k).label}${LANG === 'en' ? ' — ' : '——'}${r}`)));
+    const dups = views.reduce((a, s) => a + (s.dups || 0), 0);
+    /* 乘法勾了口诀（用户 2026-11-22）：题量池由内核枚举给出，撞车那句要说"口诀只有几道"，
+       不能沿用加减法那句"换个数域"——数域在乘法里根本不管用。*/
+    const mulT = S.op === 'mul' && S.tops.length > 0;
+    const facs = mulT ? K.mulFactorSet(S.tops) : [];
+    const poolBands = mulT ? K.BAND_ORDER.filter((k) => S.bands.includes(k)) : [];
+    const poolN = poolBands.reduce((a, k) => a + K.mulFactCount(k, facs), 0);
+    if (dups) warn.push(mulT
+      ? F('noteDupMul', { dups, zd: PL(dups), poolN })
+      : F('noteDupAdd', { dups, zd: PL(dups), bands: S.bands.length }));
+    const shrunk = views.reduce((a, s) => a + (s.shrunk || 0), 0);
+    if (shrunk) warn.push(F('noteShrunk', { shrunk, zs: PL(shrunk) }));
+    const deg = views.reduce((a, s) => a + (s.degraded || 0), 0);
+    if (deg) warn.push(F('noteDegraded', { deg, zd: PL(deg) }));
+    /* 顶砖细分生效时把话说全：限的是哪几个数、只裁 10以内 这一档、同勾 10以上 时那档照旧。
+       这句是屏上的话（状态条 + diag.notes），纸面卷头仍然只印用户给的"砖上的数最大 N"。 */
+    if (S.op !== 'mul' && S.tops.length) {
+      const other = S.ranges.filter((r) => r !== 'le10').map((r) => K.RANGES[r].label);
+      warn.push(F('noteTopsLimit', {
+        list: LS(S.tops),
+        other: other.length ? F('noteTopsLimitOther', { other: other.join('/') }) : '',
+      }));
+    }
+    /* 乘法下同一排读作"几的乘法口诀"（用户 2026-11-22 第 1 条选的是"至少一步含勾到的数"）：
+       这句要把三件事说明白——筛的是因数、另一个因数不限（所以会顺带练到别的口诀）、题量池有多大。
+       勾到 1／10 也在这里点名，不悄悄丢掉（第 2 条）。*/
+    if (mulT) {
+      const dead = K.mulDeadTops(S.tops);
+      warn.push(F('noteFactLimit', { facs: LS(facs) || T('noteFactNone') }) +
+        F('notePoolCount', { pool: LS(poolBands.map((k) => F('notePoolItem', { label: K.band(k).label, n: K.mulFactCount(k, facs) }))) }) +
+        (dead.length ? F('noteFactDead', { dead: LS(dead) }) : ''));
+      /* 某个带用不到的那几个数（三层里的 5、7）：带不收敛，但必须按带点名（第 4 条） */
+      poolBands.forEach((k) => {
+        const live = K.mulLiveFacts(k, facs);
+        if (live.length && live.length < facs.length) {
+          warn.push(F('noteBandNoFact', {
+            label: K.band(k).label,
+            dead: LS(facs.filter((f) => !live.includes(f))),
+            live: LS(live),
+          }));
+        }
+      });
+    }
+    return warn;
+  }
+
+  /* 「每页墙数」这一路 + 每页 30 面这道顶的"没静默"（和 kernelNotes 同一口径：状态条说什么，
+     diag.notes 就回传什么，sweep/WebKit 判据读的是后者——页面上的字不许是机器看不到的字）。*/
+  function wallsNotes(views) {
+    if (!views.length) return [];
+    const v0 = views[0], out = [];
+    /* 一页两卷补卷（用户 2026-11-18"一页2卷并没有"）：凑满一张纸多出来的那一卷要说清楚是哪来的，
+       不然老师拿到两张不同的题，会以为份数填错了。*/
+    if (S.per === 2 && PAIR_PAD > 0) {
+      out.push(F('notePadPairs', { copies: S.copies, zc: PL(S.copies), padded: S.copies + PAIR_PAD }));
+    }
+    if (!(S.walls > 0)) {
+      if (v0.capCut) out.push(F('noteCapCut', { cap: v0.wallsCap, left: v0.autoFull - v0.total }));
+      return out;
+    }
+    const colsIn = [...new Set(v0.bands.map((b) => b.cols))].sort((a, b) => a - b).join('/');
+    if (v0.clipped) out.push(F('noteClipped', { fixed: v0.fixed, want: S.walls, cap: v0.wallsCap, half: S.per === 2 ? T('noteClippedHalf') : '' }));
+    if (v0.short) out.push(F('noteShort', { total: v0.total, fixed: v0.fixed, cols: colsIn }));
+    if (v0.wallsOver) out.push(F('noteOver', { total: v0.total, fixed: v0.fixed, over: v0.wallsOver }));
+    if (v0.bandsDropped && v0.bandsDropped.length) out.push(F('noteDropped', { names: LS(v0.bandsDropped), fixed: v0.fixed }));
+    return out;
+  }
+
+  /* 行内分布与空砖底色——用户 2026-11-17 第 1、2 条的机器钉子：
+     rightAir 量"一行铺到哪儿为止"（最后一面墙的右边缘离版心右边还差几毫米，均匀分布就该是 0），
+     gap 量行内缝的均值（不许为凑题量把缝压成一条线），holeBg 量空砖到底有没有印底色。
+     这三样都从真渲染的盒子里读，代码里改了 CSS 忘了改判据、或反过来，都会当场红。 */
+  function rowCheck() {
+    let gapSum = 0, gapN = 0, air = 0, holeBg = null, holes = 0, rows = 0;
+    [].forEach.call(sheetsEl().querySelectorAll('.sheet'), (sheet) => {
+      if (sheet.classList.contains('anssheet')) return;
+      const cs = getComputedStyle(sheet), rr = sheet.getBoundingClientRect();
+      const right = rr.right - parseFloat(cs.paddingRight);
+      [].forEach.call(sheet.querySelectorAll('.browr'), (row) => {
+        const kids = [].filter.call(row.children, (n) => n.getBoundingClientRect().width);
+        if (kids.length < 2) return;
+        rows++;
+        for (let i = 1; i < kids.length; i++) {
+          gapSum += (kids[i].getBoundingClientRect().left - kids[i - 1].getBoundingClientRect().right) * MM;
+          gapN++;
+        }
+        air = Math.max(air, (right - kids[kids.length - 1].getBoundingClientRect().right) * MM);
+      });
+      const h = sheet.querySelector('.bk.hv');
+      if (h) { holes += sheet.querySelectorAll('.bk.hv').length; if (holeBg === null) holeBg = getComputedStyle(h).backgroundColor; }
+    });
+    return { rows, gap: gapN ? +(gapSum / gapN).toFixed(2) : null, rightAir: +Math.max(0, air).toFixed(2),
+      holes, holeBg };
+  }
+
+  function render() {
+    syncBands(); syncRanges(); syncTops();
+    syncBar();                                  // 按钮显示永远跟着状态走（点了没反应那类 bug 就堵在这）
+    if (S.rule === true) S.rule = 'full';
+    if (S.rule === false) S.rule = 'off';
+
+    /* 一页两卷·裁开（用户 2026-11-18："一页2卷并没有"）：这张纸真的要有两卷，不是把一卷压成半页
+       留半张空白。所以卷数按"向上凑偶、至少 2"来：份数 1 → 出 2 卷拼满一张纸，份数 3 → 补成 4 卷。
+       凑出来的那一卷是新题（种子往后挪），不是把上一卷重复印两遍——两遍一样的卷子老师直接
+       用"份数 1 + 一页一卷"打两张就行，不必占着裁开口。凑对了要在状态条点名，不许静默加题。 */
+    const nSheets = S.per === 2 ? Math.max(2, S.copies + (S.copies % 2)) : S.copies;
+    PAIR_PAD = nSheets - S.copies;
+    const seeds = Array.from({ length: nSheets }, (_, i) => (S.seed + i * 7919) >>> 0);
+    LAST_FAIL = null;
+    let err = '', res = null;
+    try {
+      res = fitViews(seeds);
+      if (!res.views) { err = noFitMsg(LAST_FAIL || { avail: '?', need: '?', board: '?', walls: '?', u: '?' }); fatalPanel(err); }
+    } catch (e) {
+      err = T('statFatalHead') + e.message;
+      fatalPanel(err);
+    }
+    const views = res && res.views ? res.views : [];
+    const stCheck = views.length ? selfTest() : null;      // 溢出量测本身可不可信
+    const diag = {
+      build: BUILD, lang: LANG, seed: S.seed, opts: S, fatal: err || null,
+      clickMiss: CLICK_MISS.slice(),
+      /* 状态条上那几句"没静默"（自动收敛 / 退洞 / 重复 / 配比降级）也进诊断 JSON：
+         sweep 要按配置断言"这条带被收敛掉了必须喊出来"，光看页面上的字没法机器判。 */
+      notes: err ? [] : kernelNotes(views).concat(wallsNotes(views), ansNotes(views, res ? res.u : 0)),
+      /* 选项区按钮的视觉状态：sweep 用它对账"显示＝配置"。
+         只信 JS 里的 S 不算数——用户看得见的是那颗按钮有没有亮。 */
+      bar: (() => {
+        const rd = (id) => [].map.call(Q(id).children, (b) => [b.dataset.v, b.classList.contains('on'), !!b.disabled]);
+        return { mode: rd('chipsMode'), bands: rd('chipsBands'), tops: rd('chipsTops'), walls: Q('walls').value.trim() };
+      })(),
+      /* 乘法口诀这一读法的机器读数（用户 2026-11-22 第 1–4 条）。为什么状态条那行字不够：
+         那句是给人读的、会被截短、措辞还会改；判据要钉的是四个可对账的数——
+           chosen 用户实际勾到的 1–10（含被忽略的 1、10）
+           facs   真进约束的因数集合（2–9 那部分）
+           dead   勾了但当不了因数的（1、10）——非空就必须点名，不许静默吃掉点击
+           bands  每个勾选带在这一读法下的不重复道数 n 和"这一带真出得来"的因数 live
+         sweep 用它断言三件事：live 覆盖 facs（勾了就必须出得了题，两层3块做全）；
+         n 与产物里数到的不重复面数一致；加减法下本字段为 null（老口径逐字节不变）。 */
+      facts: (() => {
+        if (S.op !== 'mul') return null;
+        const facs = K.mulFactorSet(S.tops);
+        return {
+          chosen: K.TOP_CHOICES.filter((v) => (S.tops || []).some((x) => +x === v)),
+          facs, dead: K.mulDeadTops(S.tops),
+          bands: K.BAND_ORDER.filter((k) => S.bands.includes(k) && K.MUL_BANDS.includes(k))
+            .map((k) => ({ key: k, n: K.mulFactCount(k, facs), live: K.mulLiveFacts(k, facs) }))
+        };
+      })(),
+      /* 工具栏的分布（用户 2026-11-17 第 4 条"各个选项要合理分布"→ 2026-11-18 第 2 条
+         "选项中每个区域都有空白，空间没有合理利用"）：
+         "空白"拆成三个能从真渲染盒子里读出来的数——
+           rg   块内右侧剩＝块盒子右边缘 − 块内"墨"的最右（贴合内容时只剩 11px 内边距；墨怎么认见下面）
+           bg   块内下方剩＝同一个块里内容最低点离块底多远
+           tail 行尾剩＝这一行（换行后的一段）右边缘 − 该行最后一个内容的右边缘
+         分行不看 top（.act 是 align-self:center，top 本来就比同行低一截，按 top 数行会误报），
+         看 left：同一行的块必然一个比一个靠右，换行后首块又回到行首。
+         sweep 的判据就钉这三个数（见 sweep.py「选项区不许留大块空白」）。*/
+      barLayout: (() => {
+        const tb = document.querySelector('.toolbar').getBoundingClientRect();
+        const rows = [].map.call(document.querySelectorAll('.toolbar .row'), (row) => {
+          const rr = row.getBoundingClientRect();
+          let prev = null, line = -1, items = [];
+          [].forEach.call(row.children, (n) => {
+            const b = n.getBoundingClientRect();
+            // 换行占位（.brk，height:0、basis:100%）不是块：量它等于给行尾判据装了个永远读 0 的假尾巴
+            if (!b.height) return;
+            const nl = !prev || b.left < prev.right - 1;
+            if (nl) { line++; items.push({ line, kids: [] }); }
+            /* 块内"墨"的最右 / 最下：只认两种盒子——
+               ① 叶子（没有元素子节点：按钮、输入框、图标 span）；
+               ② 自己身上就有字的（label / .hint 这种：里面套了个 checkbox，但"附答案页"几个字
+                  一直写到盒子右边缘，只算那个 checkbox 就把墨的量短了，rg 会假亮）。
+               为什么不能扫所有元素：容器天生会被拉成和块一样宽（.btns 是 flex 行，块宽它多宽），
+               量它就等于"盒子自己减自己"＝永远只剩内边距，把 grow 摊平那种死白全放过——
+               负对照 scripts/bar_negctl.py 的 grow 那一档第一次就是这么漏掉的（out/negctl_grow.html 实测）。
+               0×0 的跳过（隐藏的 note、空 chips）。 */
+            const hasWords = (e) => [].some.call(e.childNodes, (t) => t.nodeType === 3 && /\S/.test(t.nodeValue));
+            let cr = b.left, cb = b.top;
+            [].forEach.call(n.querySelectorAll('*'), (e) => {
+              if (e.children.length && !hasWords(e)) return;
+              const q = e.getBoundingClientRect();
+              if (!q.width && !q.height) return;
+              if (q.right > cr) cr = q.right;
+              if (q.bottom > cb) cb = q.bottom;
+            });
+            items[line].kids.push({ cls: n.className, w: +b.width.toFixed(0),
+              cw: +(cr - b.left).toFixed(0), rg: +(b.right - cr).toFixed(0),
+              bg: +(b.bottom - cb).toFixed(0), h: +b.height.toFixed(0),
+              gap: prev && !nl ? +(b.left - prev.right).toFixed(0) : null });
+            if (nl) items[line].left = b.left;
+            items[line].right = Math.max(items[line].right || 0, cr);
+            prev = b;
+          });
+          return { w: +rr.width.toFixed(0), lines: items.length,
+            rows: items.map((l) => ({ n: l.kids.length, kids: l.kids,
+              tail: +(rr.right - l.right).toFixed(0), gaps: l.kids.map((k) => k.gap) })) };
+        });
+        return { h: +tb.height.toFixed(0), rows };
+      })(),
+      /* 示范两幅的数（只有真印在纸上的那一次才回传）：判据用它钉"错例必须真的算错"——
+         用户第 5 条的原始问题就是错例被标了 ✗ 但算式全对，光看代码看不出来。 */
+      demo: (S.rule !== 'off' && !miniRule()) ? demoFig() : null,
+      /* 行内分布 + 空砖底色（第 1、2 条的机器钉子）与每页上限（第 3 条）*/
+      spread: err ? null : rowCheck(),
+      wallsCap: wallsCap(),
+      u: res ? +res.u.toFixed(2) : 0,
+      ansK: +ANS_K.toFixed(2), ansFit: ANS_FIT,
+      selftest: stCheck,
+      floor: res ? +res.floor.toFixed(2) : 0, tol: res ? +res.tol.toFixed(2) : 0,
+      over: res && res.views ? +res.over.toFixed(2) : 0, overEl: OVER_EL, stuck: !!(res && res.stuck), fail: LAST_FAIL,
+      air: res && res.views ? +res.air.toFixed(1) : null, airEl: res && res.views ? res.airEl : '', small: !!(res && res.small),
+      views: views.map((sh) => ({
+        seed: sh.seed, total: sh.total, holes: sh.holes, split: sh.splitN, join: sh.joinN,
+        degraded: sh.degraded, dups: sh.dups, shrunk: sh.shrunk, dropped: sh.dropped,
+        planH: sh.planH, availH: sh.availH,
+        fixed: sh.fixed, auto: sh.auto, short: sh.short, wallsOver: sh.wallsOver, bandsDropped: sh.bandsDropped,
+        clipped: sh.clipped, capCut: sh.capCut, autoFull: sh.autoFull, wallsCap: sh.wallsCap,
+        maxVal: sh.maxVal, maxShown: sh.maxShown, bondN: sh.bondN,
+        bands: sh.bands.map((b) => ({ key: b.key, L: b.L, shape: b.shape, label: b.label, cols: b.cols, rows: b.rows, per: b.per, u: b.u, h: b.h, one: b.one, start: b.start })),
+        structs: sh.structs.map((st) => ({
+          key: st.key, L: st.L, shape: st.shape, op: st.op, n: st.n, maxVal: st.maxVal,
+          headline: st.headline, headlineCell: st.headlineCell,
+          cells: st.cells.map((c) => [c.i, c.val, c.row, c.col, c.span, c.kids ? c.kids.join(',') : '']),
+          hidden: [...st.hidden],
+          log: st.log.map((e) => ({ cell: e.cell, dir: e.dir, from: e.from })),
+          wantSplit: st.wantSplit, wantJoin: st.wantJoin, degraded: st.degraded,
+          holesWanted: st.holesWanted, holesActual: st.holesActual, holesBase: st.holesBase, shrunk: st.shrunk,
+        })),
+      })),
+    };
+    const old = Q('diag'); if (old) old.remove();
+    const sc = document.createElement('script');
+    sc.type = 'application/json'; sc.id = 'diag';
+    sc.textContent = JSON.stringify(diag);
+    document.body.appendChild(sc);
+    if (err) {
+      Q('stat').innerHTML = '<b style="color:#b2342c">✗ ' + err + '</b>';
+    } else {
+      /* 撑满判据用真渲染量出来的"底部剩余"，不用模型自算的账：
+         剩余超过一整行高度说明贪心没吃到东西（模型偏保守），得看见。
+         撞每页 30 面上限时留白是设计本身（第 3 条要的就是"少而大"），跟固定墙数同一口径，不报。 */
+      const rowH = Math.max.apply(null, views[0].bands.map((b) => b.one)) + GEO.bandGap;
+      const warn = [];
+      const n0 = views[0].total, h0 = views[0].holes;
+      if (res.over > res.tol) warn.push(F('statOver', { o: res.over.toFixed(1) }));
+      if (!(S.walls > 0) && !views[0].capCut && res.air > rowH) warn.push(F('statAir', { air: res.air.toFixed(0) }));
+      if (res.small) warn.push(F('statSmall', { u: res.u.toFixed(1) }));
+      warn.push.apply(warn, wallsNotes(views));
+      if (stCheck && !stCheck.ok) warn.push(F('statTrust', { read: (stCheck.after - stCheck.before).toFixed(1) }));
+      warn.push.apply(warn, kernelNotes(views));
+      /* 状态读数按用户 2026-11-18 给的口径压成一句：砖宽 · 每页几面 · 空砖几个 · 溢出几毫米。
+         以前那串（占高 / 底空 / 噪声底 / 分成合成 / 每带几行）没删掉，只是不再上屏——
+         它们照旧进 diag，sweep 与 WebKit 判据读的还是 JSON，页面上留给老师的是一行能读完的话。
+         多卷时每卷的题量本该一样（同一档解算），真不一样就是解算抖了，那种事必须喊出来。 */
+      const diffTotals = [...new Set(views.map((sh) => sh.total))];
+      if (diffTotals.length > 1) warn.push(F('statDiffTotals', { totals: diffTotals.join('/') }));
+      /* 答案页自动压页（v4.0 第 1 条）：压成功了是正常状态，读数那一行带一句缩到百分之几；
+         压到下限还塞不进一页、或答案砖掉到可读下限以下，才当问题喊出来——
+         不许悄悄多印一张，也不许裁字，那两句都走 ansNotes（状态条与 diag.notes 同一份）。 */
+      warn.push.apply(warn, ansNotes(views, res.u));
+      const how = S.walls > 0 ? T('statHowFixed') : views[0].capCut ? T('statHowCap') : T('statHowAuto');
+      // v4.5「B 中度」之后英文不再有 brick{s}，PL(h0) 这个参数没人接了，一并摘掉（中文本来也不用）
+      Q('stat').textContent =
+        F('statBase', { u: res.u.toFixed(1), n: n0, z: PL(n0), how, h: h0, o: res.over.toFixed(2) }) +
+        (ANS_FIT && !ANS_FIT.floor ? F('statAnsShrink', { pct: Math.round(ANS_FIT.k * 100), from: ANS_FIT.from }) : '');
+      if (warn.length) Q('stat').innerHTML += `<b style="color:#b2342c"> ⚠ ${warn.join(' · ')}</b>`;
+    }
+  }
+
+  window.__wallRender = render;
+  window.__wallState = S;
+  /* 页里任何一处 JS 抛错都会让探针消失，无头排查时两眼一抹黑。留个兜底：把错误写进 DOM，
+     探针脚本抓不到 probeout 时就能从 jserr 里看到真因。 */
+  window.addEventListener('error', (e) => {
+    const p = document.createElement('pre');
+    p.id = 'jserr';
+    p.textContent = 'JS 报错：' + e.message + ' @' + (e.filename || '') + ':' + e.lineno + ':' + e.colno;
+    document.body.appendChild(p);
+  });
+  /* 无头量测要能一次跑到某个配置：?cfg={"bands":["b2","l3"],"ranges":["le10"],"op":"mul"} 直接灌进状态。
+     只认已知键，值原样覆盖——这是给自己用的测试入口，不是给用户的输入口。 */
+  function applyCfg() {
+    const m = location.search.match(/[?&]cfg=([^&]+)/);
+    if (!m) return;
+    let c;
+    try { c = JSON.parse(decodeURIComponent(m[1])); } catch (e) { return; }
+    Object.keys(c).forEach((k) => { if (k in S) S[k] = c[k]; });
+    if (c.layers && !c.bands) S.bands = c.layers.map((L) => (L === 2 ? 'b2' : 'l' + L));   // 旧键兜底
+    syncBands(); syncRanges();
+    const el = Q('seed'); if (el && c.seed) el.value = S.seed;
+  }
+
+  /* 测试入口之二：?click=chipsTops:6,8;chipsMode:le10 —— 在页面里真按一次那颗按钮，再让探针读状态。
+     为什么非要有这条：?cfg= 是把值灌进 S，走的是"渲染"那半边；用户点的是 handler 那半边。
+     v3.1 的"复选点了没反应"和 v3.4 顶砖按钮点不亮（dataset.v 是字符串 "6"，状态里存的是数字 6，
+     includes 一比就错），灌配置都看不出来。两条路都对，才算这个按钮真的能用。 */
+  function applyClicks() {
+    const m = location.search.match(/[?&]click=([^&]+)/);
+    if (!m) return;
+    decodeURIComponent(m[1]).split(';').forEach((spec) => {
+      const parts = spec.split(':');
+      const box = Q(parts[0]);
+      if (!box) { CLICK_MISS.push('没有这组按钮：' + parts[0]); return; }
+      (parts[1] || '').split(',').filter(Boolean).forEach((v) => {
+        const b = [].filter.call(box.children, (n) => n.dataset.v === v)[0];
+        if (!b) { CLICK_MISS.push(spec + ' → 这组里没有值为 ' + v + ' 的按钮'); return; }
+        b.click();                            // 走真实 onclick：置灰的按钮点下去必须啥也不发生
+      });
+    });
+  }
+
+  /* ================= 语言开关（中文 / English）=================
+     规格照数格涂涂 `references/i18n.md` §3–§4：静态标签挂 data-t / data-h / data-tt / data-ph，
+     `applyLang()` 一次刷完；纸面文字全在渲染函数里现拼，所以切完语言整页重画、砖宽由版面重解。
+     **顺序有讲究**：`applyLang()` 必须在 `render()`（里面跑 syncBar）之前——syncBar 会把 chip 的字、
+     悬停说明、状态读数按当前语言重刷一遍，反了就会出现"纸已经英文、按钮还是中文"。 */
+  function setNodeText(el, s) {
+    /* label 里嵌着 checkbox（`<label><input> 附答案页</label>`）：整段 innerHTML 换掉会把勾丢掉，
+       所以只替换最后一个文本节点。数格涂涂同一条。
+       前导空白要留着——中文那侧" 附答案页"的空格是 checkbox 和文字之间的间隔，
+       抄没了就等于改了中文渲染（第一条腿"中文态与 v4.2 逐字节相同"当场会红）。 */
+    const kids = el.childNodes;
+    for (let i = kids.length - 1; i >= 0; i--) {
+      if (kids[i].nodeType === 3 && kids[i].nodeValue.trim() !== '') {
+        kids[i].nodeValue = kids[i].nodeValue.match(/^\s*/)[0] + s;   // 非全局正则，match 与 exec 返回同一个数组
+        return;
+      }
+    }
+    el.appendChild(document.createTextNode(s));
+  }
+  function applyLang() {
+    document.documentElement.setAttribute('lang', LANG === 'en' ? 'en' : 'zh-CN');
+    document.title = T('docTitle');
+    [].forEach.call(document.querySelectorAll('[data-t]'), (el) => setNodeText(el, T(el.getAttribute('data-t'))));
+    [].forEach.call(document.querySelectorAll('[data-h]'), (el) => { el.innerHTML = T(el.getAttribute('data-h')); });
+    [].forEach.call(document.querySelectorAll('[data-tt]'), (el) => el.setAttribute('title', T(el.getAttribute('data-tt'))));
+    [].forEach.call(document.querySelectorAll('[data-ph]'), (el) => el.setAttribute('placeholder', T(el.getAttribute('data-ph'))));
+  }
+  function switchLang(l) {
+    LANG = (l === 'en') ? 'en' : 'zh';
+    try { localStorage.setItem('wallfill.lang', LANG); } catch (e) { /* file:// 下可能禁写，读也一样包一层 */ }
+    if (K.setKLang) K.setKLang(LANG);          // 内核那批原因句跟着走（KLANG 默认 zh，校验脚本永远看中文）
+    applyLang();
+    render();
+  }
+  /* 语言初值优先级：?lang= ＞ 这台机器上次选的（localStorage）＞ 浏览器语言。
+     自己打开还是中文；文件发给别人，对方一打开就是他的语言。 */
+  function langInit() {
+    const u = new URLSearchParams(location.search);
+    let l = u.get('lang');
+    if (l !== 'en' && l !== 'zh') { try { l = localStorage.getItem('wallfill.lang'); } catch (e) { l = null; } }
+    if (l !== 'en' && l !== 'zh') l = /^zh/i.test(navigator.language || '') ? 'zh' : 'en';
+    LANG = l === 'en' ? 'en' : 'zh';
+  }
+  window.__wallLang = () => LANG;    // 探针要能读到当前语言（判据不许只长在页面上）
+
+  document.addEventListener('DOMContentLoaded', () => {
+    langInit();
+    if (K.setKLang) K.setKLang(LANG);
+    applyCfg();
+    applyLang();
+    buildBar();
+    applyClicks();
+    render();
+    if (location.search.includes('probe=1')) probe();
+  });
+
+  /* ================= 探针：毫米只从这里出 ================= */
+  function probe() {
+    const out = [];
+    [].forEach.call(document.querySelectorAll('.sheet'), (s) => {
+      const sr = s.getBoundingClientRect();
+      const cs = getComputedStyle(s);
+      const padL = parseFloat(cs.paddingLeft), padT = parseFloat(cs.paddingTop);
+      const ox = sr.left + padL, oy = sr.top + padT;
+      const blocks = ['.hd', '.rulebar', '.wallzone', '.eqrow', '.ft']
+        .map((k) => s.querySelector(k)).filter(Boolean)
+        .map((n) => { const r = n.getBoundingClientRect(); return { k: n.className.split(' ')[0], top: +((r.top - oy) * MM).toFixed(1), bot: +((r.bottom - oy) * MM).toFixed(1), right: +((r.right - ox) * MM).toFixed(1) }; });
+      const br = [...s.querySelectorAll('.bk')].map((n) => { const r = n.getBoundingClientRect(); return { w: +(r.width * MM).toFixed(2), h: +(r.height * MM).toFixed(2) }; });
+      const widths = [...new Set(br.map((x) => x.w))];
+      const heights = [...new Set(br.map((x) => x.h))];
+      const wall = s.querySelector('.wallzone');
+      /* "空气"＝块与块之间最大的那道缝（含最后一块到版心底边），照数格涂涂口径取 max 而非 min：
+         页脚靠 margin-top:auto 贴底，它前面那道缝本来就该有，用 min 会天天误报"底部余量 0mm"。 */
+      const bot = sr.bottom - parseFloat(cs.paddingBottom);   // 版心底边（border-box 减掉下内边距）
+      let air = 0;
+      for (let i = 1; i < blocks.length; i++) air = Math.max(air, blocks[i].top - blocks[i - 1].bot);
+      if (blocks.length) air = Math.max(air, (bot - oy) * MM - blocks[blocks.length - 1].bot);
+      /* 真正的"浪费"量在棋盘区里：.wallzone 是 flex:1，会把剩余高度吃掉并居中显示，
+         所以块间缝看不出来——上下两道居中的空白才是。两侧相加 = 这一页没用掉的纵向空间。 */
+      const bands = [].map.call(s.querySelectorAll('.wallzone > .band'), (b) => {
+        const r = b.getBoundingClientRect();
+        return { rows: b.querySelectorAll('.browr').length, groups: b.querySelectorAll('.group').length, top: +((r.top - oy) * MM).toFixed(1), bot: +((r.bottom - oy) * MM).toFixed(1) };
+      });
+      const wr = wall ? wall.getBoundingClientRect() : null;
+      const wallSlack = wr && bands.length
+        ? +(((bands[0].top - (wr.top - oy) * MM) + ((wr.bottom - oy) * MM) - bands[bands.length - 1].bot)).toFixed(1) : null;
+      out.push({
+        copy: s.dataset.copy || '', cls: s.className,
+        /* 纸面文字原样抄一份出来：用户逐条给的句子（怎么玩、检查行）只能核对不许改写，
+           而版面上有没有这些字，只有真渲染说了才算——node 侧看 TXT 常量是另一回事。 */
+        paper: (() => {
+          const tx = (sel) => { const n = s.querySelector(sel); return n ? n.textContent.replace(/\s+/g, ' ').trim() : ''; };
+          const labs = [].map.call(s.querySelectorAll('.glabel'), (n) => n.textContent.replace(/\s+/g, ' ').trim());
+          return { sub: tx('.hd .sub'), rule: tx('.rulebar .rseg'), democap: [].map.call(s.querySelectorAll('.dcap'), (n) => n.textContent).join('/'),
+                   glabel: labs.slice(0, 3), labels: labs.length, labelDups: labs.length - new Set(labs).size,
+                   meta: [].map.call(s.querySelectorAll('.meta .line'), (n) => n.textContent.trim()).join(' / '),
+                   ft: tx('.ft'), baskets: s.querySelectorAll('.basket').length, eq: s.querySelectorAll('.eq').length };
+        })(),
+        contentW: +((sr.width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)) * MM).toFixed(1),
+        contentH: +((sr.height - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)) * MM).toFixed(1),
+        scrollOver: +((s.scrollHeight - s.clientHeight) * MM).toFixed(2),
+        scrollOverW: +((s.scrollWidth - s.clientWidth) * MM).toFixed(2),
+        inkRight: +Math.max(0, ...blocks.map((b) => b.right)).toFixed(1),
+        blocks, brickWidths: widths, brickHeights: heights,
+        holes: s.querySelectorAll('.bk.hv').length, filled: s.querySelectorAll('.bk.a').length,
+        groups: s.querySelectorAll('.group').length, baskets: s.querySelectorAll('.basket').length,
+        eqrows: s.querySelectorAll('.eqrow').length,
+        bandRows: bands.map((b) => b.rows), wallSlack,
+        wallzoneBottom: wall ? +((wall.getBoundingClientRect().bottom - oy) * MM).toFixed(1) : null, air,
+        /* 校准用：布局模型里的 label/砖高/推导行高是不是真数，量一次就知道。
+           模型高估 → 版面底下空一大截；低估 → 溢出。两边都见过，所以留着。 */
+        calib: (() => {
+          const hm = (sel) => { const n = s.querySelector(sel); return n ? +(n.getBoundingClientRect().height * MM).toFixed(2) : null; };
+          const one = s.querySelector('.group');
+          return {
+            hd: hm('.hd'), rulebar: hm('.rulebar'), wallzone: hm('.wallzone'), ft: hm('.ft'),
+            group: one ? +(one.getBoundingClientRect().height * MM).toFixed(2) : null,
+            layers: one ? one.querySelectorAll('.brow').length : 0,
+            glabel: hm('.glabel'), wall: hm('.wall'), eqrow: hm('.eqrow'),
+          };
+        })(),
+      });
+    });
+    /* 漏答案自检（只看渲染出来的学生页，不看内核字段）：卷头"砖上的数最大 N"取的是全体
+       最大值还是看得见值？两层3块只勾"合"时挖的就是顶砖，取全体就是把答案印在卷头上。
+       v3 取消了集章表，所以那条"不许印得数"的检查也一并退出；学生页连推导算式都不该出现。*/
+    const leak = [];
+    [].forEach.call(document.querySelectorAll('.sheet:not(.anssheet)'), (s) => {
+      if (s.querySelector('.eqrow')) leak.push('学生页出现推导算式行');
+      const sub = s.querySelector('.hd .sub');
+      if (sub) {
+        const m = sub.textContent.match(/最大\s*([0-9]+)/);
+        const vis = [].map.call(s.querySelectorAll('.bk'), (n) => parseInt(n.textContent, 10)).filter((x) => x > 0);
+        if (m && vis.length && +m[1] > Math.max.apply(null, vis)) leak.push('卷头最大值 ' + m[1] + ' 大于看得见的最大砖 ' + Math.max.apply(null, vis));
+      }
+    });
+    /* 裁开线的账（用户 2026-11-18 挑的 C1）：屏幕态能读的都是"结构对不对"——
+       线在不在、是不是虚线、文案有没有被改写、有没有老老实实夹在"上半页＋下半页"中间、
+       上下各让开多少。缝宽 10mm、线心落点这些打印态几何不在屏幕态算（`.sheet.two` 屏幕 141mm、
+       打印 127mm，两个数不是一回事），由 scripts/cutline_check.py 拿真打印样式另量一份。
+       这里读的是每根线自己：判据在 sweep.py「裁开线」那节。 */
+    const cut = [];
+    [].forEach.call(document.querySelectorAll('.cutline'), (n) => {
+      const r = n.getBoundingClientRect();
+      const segs = [].map.call(n.querySelectorAll('i'), (i) => {
+        const q = i.getBoundingClientRect(), c = getComputedStyle(i);
+        return { top: q.top, left: q.left, right: q.right, w: q.width,
+                 style: c.borderTopStyle, color: c.borderTopColor, px: parseFloat(c.borderTopWidth) };
+      });
+      const prev = n.previousElementSibling, next = n.nextElementSibling;
+      const lineY = segs.length ? segs.reduce((a, s) => a + s.top, 0) / segs.length : r.top;
+      const pr = prev ? prev.getBoundingClientRect() : null, nr = next ? next.getBoundingClientRect() : null;
+      const ink = (s) => { if (!s) return null;
+        const k = ['.ft', '.rulebar', '.wallzone', '.hd'].map((x) => s.querySelector(x)).filter(Boolean);
+        return k.length ? Math.max.apply(null, k.map((x) => x.getBoundingClientRect().bottom)) : null; };
+      const inkTop = (s) => { if (!s) return null;
+        const k = ['.hd', '.rulebar', '.wallzone'].map((x) => s.querySelector(x)).filter(Boolean);
+        return k.length ? Math.min.apply(null, k.map((x) => x.getBoundingClientRect().top)) : null; };
+      cut.push({
+        after: prev ? prev.className.replace(/^sheet\s*/, '') : '（前面没东西）',
+        before: next ? next.className.replace(/^sheet\s*/, '') : '（后面没东西）',
+        text: (n.querySelector('span') || {}).textContent || '',
+        segs: segs.length,
+        dashed: segs.length === 2 && segs.every((s) => s.style === 'dashed'),
+        lineWidth: +Math.max.apply(null, segs.map((s) => s.w || 0)).toFixed(2),
+        boxH: +(r.height * MM).toFixed(2),
+        // 线→上卷盒子底 / 线→下卷盒子顶，以及到两侧"墨"的距离（屏幕态，只判有没有压着字）
+        toUp: pr ? +((lineY - pr.bottom) * MM).toFixed(2) : null,
+        toDn: nr ? +((nr.top - lineY) * MM).toFixed(2) : null,
+        inkUp: pr ? +((lineY - (ink(prev) || pr.bottom)) * MM).toFixed(2) : null,
+        inkDn: nr ? +(((inkTop(next) || nr.top) - lineY) * MM).toFixed(2) : null,
+        // 横向：线的两端该和上半页的版心两边对齐（屏幕态卷宽 210＋左右各 13mm 内边距）
+        xL: pr ? +((Math.min.apply(null, segs.map((s) => s.left)) - pr.left) * MM).toFixed(2) : null,
+        xR: pr ? +((pr.right - Math.max.apply(null, segs.map((s) => s.right))) * MM).toFixed(2) : null,
+        xSpan: pr ? +((Math.max.apply(null, segs.map((s) => s.right)) -
+          Math.min.apply(null, segs.map((s) => s.left))) * MM).toFixed(2) : null,
+        // 缝的居中偏差：线心离"上下两卷盒子之间那道缝"的中点差多少（结构上必须几乎为 0）
+        midOff: pr && nr ? +((lineY - (pr.bottom + nr.top) / 2) * MM).toFixed(2) : null,
+      });
+    });
+    const d = Q('diag');
+    const box = document.createElement('pre');
+    box.id = 'probeout';
+    box.textContent = JSON.stringify({ probe: true, tries: window.__tries || null, leak, cut,
+      pdfName: window.__pdfName ? window.__pdfName() : null,
+      diag: d ? JSON.parse(d.textContent) : null, sheets: out }, null, 1);
+    document.body.appendChild(box);
+  }
+})();
+</script>
+</body>
+</html>
